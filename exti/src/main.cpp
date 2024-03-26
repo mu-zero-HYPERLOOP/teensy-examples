@@ -13,10 +13,12 @@ void setup() {
 void increaseCount() {
     ++count;
     Serial.println(count);
+    delay(100);
 }
 
 void detectRisingEdge(){
     ++count;
+    delay(100);
 }
 
 void detectFallingEdge(){
@@ -25,6 +27,7 @@ void detectFallingEdge(){
     if (count % 2 == 1) {
         Serial.println(errorMsg);
     }
+    delay(100);
 }
 
 void loop() {
