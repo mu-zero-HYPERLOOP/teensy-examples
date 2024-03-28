@@ -1,8 +1,12 @@
+#include "core_pins.h"
 #include <Arduino.h>
 
 void setup() {
   Serial.begin(38400);
   pinMode(A0, INPUT_PULLDOWN);
+  analogReadResolution(12);
+  analogReadAveraging(16);
+  analogReference(0);
 
 }
 
