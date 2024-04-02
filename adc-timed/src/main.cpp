@@ -1,3 +1,4 @@
+#include "core_pins.h"
 #include "imxrt.h"
 #include "pins_arduino.h"
 #include "wiring.h"
@@ -74,16 +75,18 @@ void flexpwm_init_signed() {     //set PWM
 
   FLEXPWM2_OUTEN |= FLEXPWM_OUTEN_PWMA_EN(0x0F); // Activate all A channels
   FLEXPWM2_OUTEN |= FLEXPWM_OUTEN_PWMB_EN(0x0F); // Activate all B channels
-  FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_LDOK(0x0F);
         // Give Load Okay for all submodules -> reload setting again
-  FLEXPWM2_SM1TCTRL = FLEXPWM_SMTCTRL_OUT_TRIG_EN((1 << 2) | (1 << 3)); 
+  FLEXPWM2_SM1TCTRL = FLEXPWM_SMTCTRL_OUT_TRIG_EN((1 << 4) | (1 << 5)); 
         // val 4 of Flexpwm2 sm1 as trigger for PWM_OUT_TRIG0
         // val 5 of Flexpwm2 sm1 as trigger for PWM_OUT_TRIG1
+  FLEXPWM2_SM1TCTRL |= FLEXPWM_SMTCTRL_PWBOT1;
+  FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_LDOK(0x0F);
 }
 
 void adc_init() {
-  pinMode(A0, INPUT);
-  pinMode(A1, INPUT);
+  pinMode(A0, INPUT_DISABLE);
+  pinMode(A1, INPUT_DISABLE);
+  analogReadResolution(8);
   analogRead(0);
   analogRead(1);
   ADC1_CFG |= ADC_CFG_ADTRG; // enable hardware trigger for conversion
@@ -146,8 +149,14 @@ void xbar_init() {
   //xbar_connect(XBARA1_IN_FLEXPWM2_PWM1_OUT_TRIG1, XBARA1_OUT_ADC_ETC_TRIG00); 
   //xbar_connect(XBARA1_IN_FLEXPWM2_PWM1_OUT_TRIG0, XBARA1_OUT_ADC_ETC_TRIG00); 
   //xbar_connect(XBARA1_IN_FLEXPWM2_PWM2_OUT_TRIG1, XBARA1_OUT_ADC_ETC_TRIG00); 
-  //xbar_connect(XBARA1_IN_FLEXPWM2_PWM2_OUT_TRIG0, XBARA1_OUT_ADC_ETC_TRIG00); 
+  xbar_connect(XBARA1_IN_FLEXPWM2_PWM2_OUT_TRIG0, XBARA1_OUT_ADC_ETC_TRIG00); 
         // connect FlexPWM2 submodule1 to adc_etc
+  IOMUXC_GPR_GPR6 &= ~IOMUXC_GPR_GPR6_IOMUXC_XBAR_DIR_SEL_7;
+  XBARA1_CTRL0 |= (1 << 10) | (1 << 2);
+  xbar_connect(XBARA1_IN_IOMUX_XBAR_INOUT07, XBARA1_OUT_ADC_ETC_TRIG00);
+   //inout07 is gpio3
+  IOMUXC_GPR_GPR6 |= IOMUXC_GPR_GPR6_IOMUXC_XBAR_DIR_SEL_6;
+  xbar_connect(XBARA1_IN_FLEXPWM2_PWM2_OUT_TRIG0, XBARA1_OUT_IOMUX_XBAR_INOUT06);
 }
 
 void setup() {
@@ -156,6 +165,7 @@ void setup() {
   //flexpwm_init_edgealigned();
   *(portConfigRegister(4)) = 1; // set pin 4 as output
   *(portConfigRegister(5)) = 1; // set pin 5 as output
+  pinMode(3, INPUT);
   xbar_init();
   adc_init();
   adc_etc_init();
@@ -200,10 +210,10 @@ void loop() {
 
 
 
-  ADC_ETC_TRIG0_CTRL |= ADC_ETC_TRIG_CTRL_TRIG_MODE;
-  ADC_ETC_TRIG0_CTRL |= ADC_ETC_TRIG_CTRL_SW_TRIG;
+  //ADC_ETC_TRIG0_CTRL |= ADC_ETC_TRIG_CTRL_TRIG_MODE;
+  //ADC_ETC_TRIG0_CTRL |= ADC_ETC_TRIG_CTRL_SW_TRIG;
 
-  Serial.println("aa");
+  //Serial.println("aa");
 
 
 }
