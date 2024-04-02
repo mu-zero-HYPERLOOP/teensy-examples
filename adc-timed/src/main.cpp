@@ -2,22 +2,24 @@
 #include "pins_arduino.h"
 #include <Arduino.h>
 
+#define PRREG(x) Serial.print(#x" 0x"); Serial.println(x,HEX)
 
 uint16_t PWM_SM0_Div = 4; // refer to page 3147 of reference manual
 uint16_t PWM_range = 500; // PWM range from 0 to 500
 uint16_t PWM_pulsewidth = 10;
 
 
-void adc_etc0_isr() {
-  ADC_ETC_DONE0_1_IRQ |= 1; // clear interrupt source
+void adcetc0_isr() {
+  ADC_ETC_DONE0_1_IRQ |= ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(0); // clear interrupt source TRIG0_DONE0
   unsigned int res = ADC_ETC_TRIG0_RESULT_1_0 & 0xfff;
   Serial.print("from etc0: ");
-  Serial.println(res);
+  Serial.println(ADC_ETC_TRIG0_RESULT_1_0);
+  Serial.println(ADC_ETC_DONE0_1_IRQ);
   asm("dsb"); // make sure memory accesses complete
 }
 
-void adc_etc1_isr() {
-  ADC_ETC_DONE0_1_IRQ |= 1 << 16; // clear interrupt source
+void adcetc1_isr() {
+  ADC_ETC_DONE0_1_IRQ |= ADC_ETC_DONE0_1_IRQ_TRIG_DONE1(0); // clear interrupt source TRIG0_DONE1
   unsigned int res = (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 0xfff;
   Serial.print("from etc1: ");
   Serial.println(res);
@@ -74,22 +76,30 @@ void flexpwm_init_signed() {     //set PWM
   FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_LDOK(0x0F);
         // Give Load Okay for all submodules -> reload setting again
   FLEXPWM2_SM1TCTRL = FLEXPWM_SMTCTRL_OUT_TRIG_EN((1 << 4) | (1 << 5)); 
-        // val 4 of Flexpwm sm1 as trigger for PWM_OUT_TRIG0
-        // val 5 of Flexpwm sm1 as trigger for PWM_OUT_TRIG1
+        // val 4 of Flexpwm2 sm1 as trigger for PWM_OUT_TRIG0
+        // val 5 of Flexpwm2 sm1 as trigger for PWM_OUT_TRIG1
 }
 
 void adc_init() {
+  pinMode(0, INPUT);
+  pinMode(1, INPUT);
   analogRead(0);
   analogRead(1);
-  ADC1_CFG |= ADC_CFG_ADTRG; // enable hardware trigger for conversion
+  //ADC1_CFG |= ADC_CFG_ADTRG; // enable hardware trigger for conversion
+  ADC1_CFG &= ~ADC_CFG_ADTRG; // enable software trigger for conversion
+  ADC1_HC0 |= (1 << 7); // enable conversion complete interrupt
   ADC1_HC0 = 0b10000; // set input select to external selection from ADC_ETC
   ADC1_HC1 = 0b10000; // same for hardware trigger control 1
 }
 
 void adc_etc_init() {
-  ADC_ETC_CTRL &= ~(1 << 31); // trigger software reset of all registers in ADC_ETC
-  ADC_ETC_CTRL = (1 << 30) | 1; 
-        // bypass touch screen control to adc2 and enable external xbar trigger0
+  ADC_ETC_CTRL = ADC_ETC_CTRL_SOFTRST; 
+  ADC_ETC_CTRL &= ~ADC_ETC_CTRL_SOFTRST;
+        // trigger software reset of all registers in ADC_ETC
+  ADC_ETC_CTRL |= ADC_ETC_CTRL_TSC_BYPASS; // bypass touch screen control to adc2
+  ADC_ETC_CTRL |= ADC_ETC_CTRL_TRIG_ENABLE(0b11111111);
+        // enable all external xbar triggers
+
   ADC_ETC_TRIG0_CTRL = ADC_ETC_TRIG_CTRL_TRIG_CHAIN(2);
         // set length of trigger chain 
         // (might be very interesting for many reads back to back)
@@ -111,10 +121,10 @@ void adc_etc_init() {
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL0(7);
         // select adc channel (A0)
   
-  attachInterruptVector(IRQ_ADC_ETC0, adc_etc0_isr);
+  attachInterruptVector(IRQ_ADC_ETC0, adcetc0_isr);
   NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-  attachInterruptVector(IRQ_ADC_ETC1, adc_etc1_isr);
-  NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
+  //attachInterruptVector(IRQ_ADC_ETC1, adcetc1_isr);
+  //NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
 }
 
 void xbar_connect(unsigned int input, unsigned int output) {
@@ -132,21 +142,32 @@ void xbar_connect(unsigned int input, unsigned int output) {
 
 void xbar_init() {
   CCM_CCGR2 |= CCM_CCGR2_XBAR1(CCM_CCGR_ON);   //turn on clock for xbar1
-  xbar_connect(XBARA1_IN_FLEXPWM2_PWM1_OUT_TRIG0, XBARA1_OUT_ADC_ETC_TRIG00); 
+  //xbar_connect(XBARA1_IN_FLEXPWM2_PWM1_OUT_TRIG1, XBARA1_OUT_ADC_ETC_TRIG00); 
+  //xbar_connect(XBARA1_IN_FLEXPWM2_PWM1_OUT_TRIG0, XBARA1_OUT_ADC_ETC_TRIG00); 
+  //xbar_connect(XBARA1_IN_FLEXPWM2_PWM2_OUT_TRIG1, XBARA1_OUT_ADC_ETC_TRIG00); 
+  //xbar_connect(XBARA1_IN_FLEXPWM2_PWM2_OUT_TRIG0, XBARA1_OUT_ADC_ETC_TRIG00); 
         // connect FlexPWM2 submodule1 to adc_etc
 }
 
 void setup() {
-  flexpwm_init_edgealigned();
-  flexpwm_init_signed();
+  Serial.begin(38400);
+  delay(5000);
+  //flexpwm_init_edgealigned();
   *(portConfigRegister(4)) = 1; // set pin 4 as output
   *(portConfigRegister(5)) = 1; // set pin 5 as output
+  xbar_init();
   adc_init();
   adc_etc_init();
-  xbar_init();
-  delay(1000);
-  Serial.begin(38400);
+  flexpwm_init_signed();
+
+  Serial.println(ADC_ETC_DONE0_1_IRQ);
   Serial.println("init complete");
+  PRREG(ADC1_CFG);
+  PRREG(ADC1_HC0);
+  PRREG(ADC1_HC1);
+  PRREG(ADC_ETC_CTRL);
+  PRREG(ADC_ETC_TRIG0_CTRL);
+  PRREG(ADC_ETC_TRIG0_CHAIN_1_0);
 }
 
 
@@ -161,6 +182,16 @@ void loop() {
   FLEXPWM2_SM1VAL3 = -FLEXPWM2_SM1VAL2;
 
   FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_LDOK(0x0f);
+
+  //Serial.print("sm0 val2: ");
+  //Serial.println(FLEXPWM2_SM0VAL2);
+  //Serial.print("sm0 val3: ");
+  //Serial.println(FLEXPWM2_SM0VAL3);
+
+  //Serial.print("sm1 val2: ");
+  //Serial.println((int16_t) FLEXPWM2_SM1VAL2);
+  //Serial.print("sm1 val3: ");
+  //Serial.println(FLEXPWM2_SM1VAL3);
   delay(10);
 
 
