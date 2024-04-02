@@ -11,12 +11,16 @@ uint16_t PWM_pulsewidth = 10;
 void adc_etc0_isr() {
   ADC_ETC_DONE0_1_IRQ |= 1; // clear interrupt source
   unsigned int res = ADC_ETC_TRIG0_RESULT_1_0 & 0xfff;
+  Serial.print("from etc0: ");
+  Serial.println(res);
   asm("dsb"); // make sure memory accesses complete
 }
 
 void adc_etc1_isr() {
   ADC_ETC_DONE0_1_IRQ |= 1 << 16; // clear interrupt source
   unsigned int res = (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 0xfff;
+  Serial.print("from etc1: ");
+  Serial.println(res);
   asm("dsb"); // make sure memory accesses complete
 }
 
@@ -62,8 +66,8 @@ void flexpwm_init_signed() {     //set PWM
   FLEXPWM2_SM1VAL2 = FLEXPWM2_SM1INIT; // start of pulse on A
   FLEXPWM2_SM1VAL3 = FLEXPWM2_SM1VAL1; // end of pulse on A
   // PWM B edges
-  FLEXPWM2_SM1VAL4 = -128; // adc trigger
-  FLEXPWM2_SM1VAL5 = 128; // adc trigger
+  FLEXPWM2_SM1VAL4 = -64; // adc trigger
+  FLEXPWM2_SM1VAL5 = 64; // adc trigger
 
   FLEXPWM2_OUTEN |= FLEXPWM_OUTEN_PWMA_EN(0x0F); // Activate all A channels
   FLEXPWM2_OUTEN |= FLEXPWM_OUTEN_PWMB_EN(0x0F); // Activate all B channels
@@ -97,7 +101,7 @@ void adc_etc_init() {
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS1(0b10);
         // hardware trigger select of ADC_TRIG1
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL1(8);
-        // select adc channel
+        // select adc channel (A1)
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_IE0(0b01);
         // interrupt done0 when segment0 finished
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_B2B0;
@@ -105,7 +109,7 @@ void adc_etc_init() {
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b1);
         // hardware trigger select of ADC_TRIG0
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL0(7);
-        // select adc channel
+        // select adc channel (A0)
   
   attachInterruptVector(IRQ_ADC_ETC0, adc_etc0_isr);
   NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
@@ -129,7 +133,7 @@ void xbar_connect(unsigned int input, unsigned int output) {
 void xbar_init() {
   CCM_CCGR2 |= CCM_CCGR2_XBAR1(CCM_CCGR_ON);   //turn on clock for xbar1
   xbar_connect(XBARA1_IN_FLEXPWM2_PWM1_OUT_TRIG0, XBARA1_OUT_ADC_ETC_TRIG00); 
-        // connect FlexPWM to adc_etc
+        // connect FlexPWM2 submodule1 to adc_etc
 }
 
 void setup() {
@@ -137,7 +141,12 @@ void setup() {
   flexpwm_init_signed();
   *(portConfigRegister(4)) = 1; // set pin 4 as output
   *(portConfigRegister(5)) = 1; // set pin 5 as output
-
+  adc_init();
+  adc_etc_init();
+  xbar_init();
+  delay(1000);
+  Serial.begin(38400);
+  Serial.println("init complete");
 }
 
 
