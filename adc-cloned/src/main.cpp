@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "core_pins.h"
 #include "imxrt.h"
 #include <ADC.h>
 
@@ -18,7 +19,7 @@ void adcetc0_isr() {
   ADC_ETC_DONE0_1_IRQ |= 1;   // clear
   val0 += ADC_ETC_TRIG0_RESULT_1_0 & 4095;
   New0++;
-  Serial.println("hello from isr0");
+  //Serial.println("hello from isr0");
   asm("dsb");
 }
 
@@ -26,7 +27,7 @@ void adcetc1_isr() {
   ADC_ETC_DONE0_1_IRQ |= 1 << 16;   // clear
   val1 += (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 4095;
   New1++;
-  Serial.println("hello from isr1");
+  // Serial.println("hello from isr1");
   asm("dsb");
 }
 
@@ -36,14 +37,14 @@ void adc_init() {
   analogRead(0);
   analogRead(1);
   ADC1_CFG |= ADC_CFG_ADTRG;   // hardware trigger
-  // ADC1_CFG = 0x200b;
-  ADC1_HC0 = 16;   // ADC_ETC channel
-  ADC1_HC1 = 16;
+  ADC1_HC0 = ADC_HC_ADCH(16);
+  ADC1_HC1 = ADC_HC_ADCH(16);
 }
 
 void adc_etc_init() {
-  ADC_ETC_CTRL &= ~(1 << 31); // SOFTRST
-  ADC_ETC_CTRL = 0x40000001;  // start with trigger 0; TSC_BYPASS: TSC will control ADC2 directly
+  ADC_ETC_CTRL &= ~ADC_ETC_CTRL_SOFTRST; // SOFTRST
+  ADC_ETC_CTRL |= ADC_ETC_CTRL_TSC_BYPASS;
+  ADC_ETC_CTRL |= ADC_ETC_CTRL_TRIG_ENABLE(0b11111111);
   ADC_ETC_TRIG0_CTRL = 0x100;   // chainlength -1; TRIG chain length to the ADC Chain = 2
   ADC_ETC_TRIG0_CHAIN_1_0 = 0x50283017;   // ADC1 7 8, chain channel, HWTS, IE, B2B;
   // Chain 1: Finished Interrupt on Done1, Enable B2B, the next ADC trigger will be sent as soon as possible. ADC hardware trigger selection:2, ADC channel selection 8
@@ -115,6 +116,9 @@ void setup() {
   PRREG(ADC_ETC_CTRL);
   PRREG(ADC_ETC_TRIG0_CTRL);
   PRREG(ADC_ETC_TRIG0_CHAIN_1_0);
+  PRREG(FLEXPWM2_SM0CTRL);
+  PRREG(FLEXPWM2_SM0CTRL2);
+  PRREG(FLEXPWM2_OUTEN);
 }
 
 void loop() {
