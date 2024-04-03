@@ -9,22 +9,20 @@
 uint16_t PWM_SM0_Div = 4; // refer to page 3147 of reference manual
 uint16_t PWM_range = 500; // PWM range from 0 to 500
 uint16_t PWM_pulsewidth = 10;
+volatile uint16_t val0, val1;
 
 
 void adc_etc0_isr() {
   ADC_ETC_DONE0_1_IRQ |= ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(0); // clear interrupt source TRIG0_DONE0
-  unsigned int res = ADC_ETC_TRIG0_RESULT_1_0 & 0xfff;
-  Serial.print("from etc0: ");
-  Serial.println(res);
+  val0 = ADC_ETC_TRIG0_RESULT_1_0 & 0xfff;
+  Serial.println(val0);
   //PRREG(ADC_ETC_TRIG0_RESULT_1_0);
   asm("dsb"); // make sure memory accesses complete
 }
 
 void adc_etc1_isr() {
   ADC_ETC_DONE0_1_IRQ |= ADC_ETC_DONE0_1_IRQ_TRIG_DONE1(0); // clear interrupt source TRIG0_DONE1
-  unsigned int res = (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 0xfff;
-  Serial.print("from etc1: ");
-  Serial.println(res);
+  //val1 = (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 0xfff;
   asm("dsb"); // make sure memory accesses complete
 }
 
@@ -58,27 +56,29 @@ void flexpwm_init_edgealigned() {     //set PWM
 void flexpwm_init_signed() {     //set PWM
   FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_CLDOK(0x0F);
         // Clear Load Okay for all submodules -> no reload of PWM settings
-  FLEXPWM2_SM1CTRL = FLEXPWM_SMCTRL_FULL | FLEXPWM_SMCTRL_PRSC(9); 
+  FLEXPWM2_SM1CTRL = FLEXPWM_SMCTRL_FULL | FLEXPWM_SMCTRL_PRSC(0b111); 
         // Full cycle update (@val1) and prescaler value
-  FLEXPWM2_SM1CTRL2 = FLEXPWM_SMCTRL2_INDEP | FLEXPWM_SMCTRL2_CLK_SEL(0); 
+  FLEXPWM2_SM1CTRL2 = FLEXPWM_SMCTRL2_INDEP | FLEXPWM_SMCTRL2_CLK_SEL(0b00); 
         // A & B independant and use IPBus clock for counter/prescaler
-  FLEXPWM2_SM1INIT = -128; // value to start at after reset
+  FLEXPWM2_SM1INIT = 0x8000; // value to start at after reset
+                             // should be max negative value
   PRREG(FLEXPWM2_SM1INIT);
                          
   FLEXPWM2_SM1VAL0 = 0; // mid point for symetrical pulse around 0x00 not used
-  FLEXPWM2_SM1VAL1 = 128; // value at which counter resets
+  FLEXPWM2_SM1VAL1 = 0x7fff; // value at which counter resets
+                             // should be max positive value
   // PWM A edges
-  FLEXPWM2_SM1VAL2 = FLEXPWM2_SM1INIT; // start of pulse on A
-  FLEXPWM2_SM1VAL3 = FLEXPWM2_SM1VAL1; // end of pulse on A
+  FLEXPWM2_SM1VAL2 = -200; // start of pulse on A
+  FLEXPWM2_SM1VAL3 = 200; // end of pulse on A
   // PWM B edges
-  FLEXPWM2_SM1VAL4 = -64; // adc trigger
+  FLEXPWM2_SM1VAL4 = -201; // adc trigger
   FLEXPWM2_SM1VAL5 = 64; // adc trigger
 
   FLEXPWM2_OUTEN |= FLEXPWM_OUTEN_PWMA_EN(0b0010); // Activate all A channels
   FLEXPWM2_OUTEN |= FLEXPWM_OUTEN_PWMB_EN(0b0010); // Activate all B channels
   FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_LDOK(0x0F);
         // Give Load Okay for all submodules -> reload setting again
-  FLEXPWM2_SM1TCTRL = FLEXPWM_SMTCTRL_OUT_TRIG_EN((1 << 4) | (1 << 5)); 
+  FLEXPWM2_SM1TCTRL = FLEXPWM_SMTCTRL_OUT_TRIG_EN((1 << 4)); 
         // val 4 of Flexpwm2 sm1 as trigger for PWM_OUT_TRIG0
         // val 5 of Flexpwm2 sm1 as trigger for PWM_OUT_TRIG1
 }
@@ -86,14 +86,16 @@ void flexpwm_init_signed() {     //set PWM
 void adc_init() {
   analogRead(0);
   analogRead(1);
-  ADC1_CFG = ADC_CFG_OVWREN;
-  ADC1_CFG |= ADC_CFG_AVGS(0b00);
+  ADC1_CFG = ADC_CFG_OVWREN; // allows to overwrite unread result from conversion
+                             // seems to be necessary for etc trigger to work
+  ADC1_CFG |= ADC_CFG_AVGS(0b00); // number of hardware averages taken
   ADC1_CFG |= ADC_CFG_ADTRG; // enable hardware trigger for conversion
-  ADC1_CFG |= ADC_CFG_ADHSC;
-  ADC1_CFG |= ADC_CFG_ADSTS(0b01);
-  ADC1_CFG |= ADC_CFG_ADIV(0b01);
-  ADC1_CFG |= ADC_CFG_MODE(0b10);
-  ADC1_CFG |= ADC_CFG_ADICLK(0b00);
+  ADC1_CFG |= ADC_CFG_ADHSC; // enable high speed conversion
+  ADC1_CFG |= ADC_CFG_ADSTS(0b01); // number of clock cycles for sampling
+  ADC1_CFG |= ADC_CFG_ADIV(0b01); // clock divider
+  // ADC1_CFG |= ADC_CFG_ADLSMP; // enable long sampling time (see ADSTS)
+  ADC1_CFG |= ADC_CFG_MODE(0b10); // conversion resolution. 0b10 = 12bit
+  ADC1_CFG |= ADC_CFG_ADICLK(0b00); // input clock select
   ADC1_HC0 = ADC_HC_ADCH(16); // set input select to external selection from ADC_ETC
   ADC1_HC1 = ADC_HC_ADCH(16); // same for hardware trigger control 1
 }
@@ -178,16 +180,16 @@ void setup() {
 
 
 void loop() {
-  FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_CLDOK(0x0f);
+  //FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_CLDOK(0x0f);
 
-  FLEXPWM2_SM0VAL3++;
-  if (FLEXPWM2_SM0VAL3 > FLEXPWM2_SM0VAL1) FLEXPWM2_SM0VAL3 = FLEXPWM2_SM0INIT;
+  //FLEXPWM2_SM0VAL3++;
+  //if (FLEXPWM2_SM0VAL3 > FLEXPWM2_SM0VAL1) FLEXPWM2_SM0VAL3 = FLEXPWM2_SM0INIT;
 
-  FLEXPWM2_SM1VAL2++;
-  if ((int16_t)FLEXPWM2_SM1VAL2 >= 0) FLEXPWM2_SM1VAL2 = FLEXPWM2_SM1INIT;
-  FLEXPWM2_SM1VAL3 = -(int16_t)FLEXPWM2_SM1VAL2;
+  //FLEXPWM2_SM1VAL2++;
+  //if ((int16_t)FLEXPWM2_SM1VAL2 >= 0) FLEXPWM2_SM1VAL2 = FLEXPWM2_SM1INIT;
+  //FLEXPWM2_SM1VAL3 = -(int16_t)FLEXPWM2_SM1VAL2;
 
-  FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_LDOK(0x0f);
+  //FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_LDOK(0x0f);
 
   //Serial.print("sm0 val2: ");
   //Serial.println(FLEXPWM2_SM0VAL2);
@@ -199,6 +201,10 @@ void loop() {
   //Serial.print("sm1 val3: ");
   //Serial.println(FLEXPWM2_SM1VAL3);
   delay(10);
+  //Serial.print("val0 ");
+  //Serial.println(val0);
+  //Serial.print("val1 ");
+  //Serial.println(val1);
   //Serial.println("loop still alive");
 
 
