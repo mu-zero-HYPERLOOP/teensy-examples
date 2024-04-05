@@ -1,5 +1,4 @@
-#ifndef MOVINGAVG_H_INCLUDED
-#define MOVINGAVG_H_INCLUDED
+#pragma once
 
 template<unsigned long long WINDOW_SIZE>
 class MovingAvg
@@ -31,4 +30,3 @@ class MovingAvg
         int m_next;         // index to the next reading
         float m_readings[WINDOW_SIZE];    // interval array
 };
-#endif
