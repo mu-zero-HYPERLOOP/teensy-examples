@@ -1,5 +1,14 @@
 #pragma once
 
+
+// FIXME! Some hints about performance! 
+// Here you are using a lot of floating ops, which are always slower than fixed point integer operations
+// For example m_sum += initalValue will be relativly slow. 
+// Additionally you are storing it in a float[WINDOW_SIZE] array, which is also a bit overkill
+// Here is what i would change!
+// store m_sum, m_readings in uint16_t (halfs memory) and perform only one floating division
+// on getAvg(), this might be a bit better, the only downside is that it will have to convert a 
+// integer to a float here, but i think that's probably still faster.
 template <unsigned long long WINDOW_SIZE> class MovingAvg {
 public:
   MovingAvg(float initialValue = 0) : m_sum(0), m_next(0) {
