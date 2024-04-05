@@ -1,15 +1,15 @@
 #include <Arduino.h>
 
-constexpr int HIGH 1;
-constexpr int LOW 0;
+constexpr const int high = 1;
+constexpr const int low = 0;
 
 const byte edgeDetectionPin = 2;
 const byte directionDetectionPin = 3;
 const byte driveLeftPin = 4;
 const byte driveRightPin = 5;
 
-const byte edgeDetectorIndex = 1;
-const bool directionDetectorIndex = 0;
+volatile byte edgeDetectorIndex = 1;
+volatile bool directionDetectorIndex = 0;
 
 String direction = "steady";
 const int stripes = 5;
@@ -20,13 +20,13 @@ int trackLength = 2*stripes + 1;
 
 void readDirectionOnRising() {
     int val = digitalReadFast(directionDetectionPin);
-    direction = (val == HIGH) ? "left" : "right";
+    direction = (val == high) ? "left" : "right";
     attachInterrupt(digitalPinToInterrupt(edgeDetectionPin), readDirectionOnFalling, FALLING);
 }
 
 void readDirectionOnFalling() {
     int val = digitalReadFast(directionDetectionPin);
-    direction = (val == HIGH) ? "right" : "left";
+    direction = (val == high) ? "right" : "left";
     attachInterrupt(digitalPinToInterrupt(edgeDetectionPin), readDirectionOnRising, RISING);
 }
 
@@ -37,19 +37,19 @@ void driveRight() {
     edgeDetectorIndex = std::min(edgeDetectorIndex + 1, trackLength - 1);
     directionDetectorIndex = std::min(directionDetectorIndex + 1, trackLength - 2);
     digitalWrite(directionDetectionPin, track[directionDetectorIndex]);
-    digitalWrite(edgeDetectionPin, track[edgeDetectorIndex])
+    digitalWrite(edgeDetectionPin, track[edgeDetectorIndex]);
 }
 
 void driveLeft() {
     edgeDetectorIndex = std::max(edgeDetectorIndex - 1, 1);
     directionDetectorIndex = std::max(directionDetectorIndex - 1, 0);
     digitalWrite(directionDetectionPin, track[directionDetectorIndex]);
-    digitalWrite(edgeDetectionPin, track[edgeDetectorIndex])
+    digitalWrite(edgeDetectionPin, track[edgeDetectorIndex]);
 }
 
 void createTrack() {
     for (int i = 0; i < trackLength; ++i) {
-        track[i] = (i % 2 == 0) ? LOW : HIGH;
+        track[i] = (i % 2 == 0) ? low : high;
     }
 }
 
@@ -71,5 +71,5 @@ void setup() {
 
 void loop() {
     delay(100);
-    Serial.printf(direction);
+    Serial.println(direction);
 }
