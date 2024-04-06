@@ -9,14 +9,22 @@
 uint16_t PWM_SM0_Div = 4; // refer to page 3147 of reference manual
 uint16_t PWM_range = 500; // PWM range from 0 to 500
 uint16_t PWM_pulsewidth = 10;
-volatile uint16_t val0, val1;
+volatile uint16_t val0, val1, val2, val3;
 
 
 void adc_etc0_isr() {
   ADC_ETC_DONE0_1_IRQ |= ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(0); // clear interrupt source TRIG0_DONE0
   val0 = ADC_ETC_TRIG0_RESULT_1_0 & 0xfff;
-  Serial.println(val0);
-  //PRREG(ADC_ETC_TRIG0_RESULT_1_0);
+  val1 = (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 0xfff;
+  val2 = ADC_ETC_TRIG0_RESULT_3_2 & 0xfff;
+  val3 = (ADC_ETC_TRIG0_RESULT_3_2 >> 16) & 0xfff;
+  Serial.print(val0);
+  Serial.print("\t");
+  Serial.print(val1);
+  Serial.print("\t");
+  Serial.print(val2);
+  Serial.print("\t");
+  Serial.println(val3);
   asm("dsb"); // make sure memory accesses complete
 }
 
@@ -71,7 +79,7 @@ void flexpwm_init_signed() {     //set PWM
   FLEXPWM2_SM1VAL2 = -200; // start of pulse on A
   FLEXPWM2_SM1VAL3 = 200; // end of pulse on A
   // PWM B edges
-  FLEXPWM2_SM1VAL4 = -201; // adc trigger
+  FLEXPWM2_SM1VAL4 = -202; // adc trigger
   FLEXPWM2_SM1VAL5 = 64; // adc trigger
 
   FLEXPWM2_OUTEN |= FLEXPWM_OUTEN_PWMA_EN(0b0010); // Activate all A channels
@@ -92,7 +100,7 @@ void adc_init() {
   ADC1_CFG |= ADC_CFG_ADTRG; // enable hardware trigger for conversion
   ADC1_CFG |= ADC_CFG_ADHSC; // enable high speed conversion
   ADC1_CFG |= ADC_CFG_ADSTS(0b01); // number of clock cycles for sampling
-  ADC1_CFG |= ADC_CFG_ADIV(0b01); // clock divider
+  ADC1_CFG |= ADC_CFG_ADIV(0b00); // clock divider
   // ADC1_CFG |= ADC_CFG_ADLSMP; // enable long sampling time (see ADSTS)
   ADC1_CFG |= ADC_CFG_MODE(0b10); // conversion resolution. 0b10 = 12bit
   ADC1_CFG |= ADC_CFG_ADICLK(0b00); // input clock select
@@ -100,39 +108,65 @@ void adc_init() {
   ADC1_HC1 = ADC_HC_ADCH(16); // same for hardware trigger control 1
 }
 
+struct AdcEtcBeginInfo {
+  
+};
+
+struct TrigChainInfo {
+
+};
+
+struct AdcEtc {
+  void begin(AdcEtcBeginInfo info);
+  uint16_t readSingle(int pin);
+
+};
+
+
+
 void adc_etc_init() {
   ADC_ETC_CTRL = ADC_ETC_CTRL_SOFTRST; 
   ADC_ETC_CTRL &= ~ADC_ETC_CTRL_SOFTRST;
         // trigger software reset of all registers in ADC_ETC
   ADC_ETC_CTRL |= ADC_ETC_CTRL_TSC_BYPASS; // bypass touch screen control to adc2
-  ADC_ETC_CTRL |= ADC_ETC_CTRL_TRIG_ENABLE(0b11111111);
-        // enable all external xbar triggers
+  ADC_ETC_CTRL |= ADC_ETC_CTRL_TRIG_ENABLE(0b00000001);
+        // select external xbar triggers
 
-  ADC_ETC_TRIG0_CTRL = ADC_ETC_TRIG_CTRL_TRIG_CHAIN(1);
+  ADC_ETC_TRIG0_CTRL = ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0b011);
         // set length of trigger chain 
-        // (might be very interesting for many reads back to back)
         
-  ADC_ETC_TRIG0_CHAIN_1_0 = ADC_ETC_TRIG_CHAIN_IE1(0b10);
-        // interrupt done1 when segment1 finished
+  ADC_ETC_TRIG0_CHAIN_1_0 = ADC_ETC_TRIG_CHAIN_IE1(0b00);
+        // select interrupt after segment finished
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_B2B1;
-        // trigger next conversion immediately after segment1 finished
-  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS1(0b10);
-        // hardware trigger select of ADC_TRIG1
+        // trigger next conversion immediately after segment finished
+  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS1(0b00000010);
+        // hardware trigger select
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL1(8);
-        // select adc channel
-  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_IE0(0b01);
-        // interrupt done0 when segment0 finished
+        // select adc channel -> pin 15
+  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_IE0(0b00);
+        // select interrupt after segment finished
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_B2B0;
-        // trigger next conversion immediately after segment0 finished
-  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b1);
-        // hardware trigger select of ADC_TRIG0
+        // trigger next conversion immediately after segment finished
+  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b00000010);
+        // hardware trigger select
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL0(7);
-        // select adc channel
+        // select adc channel -> pin 14
   
+  ADC_ETC_TRIG0_CHAIN_3_2 = ADC_ETC_TRIG_CHAIN_IE1(0b01);
+        // interrupt done0 when segment3 finished
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_B2B1;
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_HWTS1(0b00000010);
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_CSEL1(11);
+        // select adc channel -> pin 17
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_IE0(0b00);
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_B2B0;
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b00000010);
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_CSEL0(12);
+        // select adc channel -> pin 16
   attachInterruptVector(IRQ_ADC_ETC0, adc_etc0_isr);
   NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-  attachInterruptVector(IRQ_ADC_ETC1, adc_etc1_isr);
-  NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
+  //attachInterruptVector(IRQ_ADC_ETC1, adc_etc1_isr);
+  //NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
 }
 
 void xbar_connect(unsigned int input, unsigned int output) {
