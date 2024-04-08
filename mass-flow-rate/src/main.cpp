@@ -1,6 +1,7 @@
 #include <Arduino.h>
 constexpr const int mainPeriod = 100;
 
+const byte interruptPin = 2;
 long previousMillis = 0; // will store last time of the cycle end
 volatile unsigned long duration=0; // accumulates pulse width
 volatile unsigned int pulsecount=0;
@@ -16,7 +17,8 @@ void pulseHandler() // interrupt handler
 
 void setup()
 {
-  attachInterrupt(0, pulseHandler, CHANGE);
+  pinMode(interruptPin, INPUT_PULLDOWN);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), pulseHandler, CHANGE);
 }
 
 void loop()
