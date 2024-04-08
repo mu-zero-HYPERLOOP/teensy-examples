@@ -15,7 +15,15 @@ __attribute__((weak)) void adc_etc_done0_isr(AdcTrigRes res) {
   Serial.print("\t");
   Serial.print(res.trig_res<0, 2>());
   Serial.print("\t");
-  Serial.println(res.trig_res<0, 3>());
+  Serial.print(res.trig_res<0, 3>());
+  Serial.print("\t");
+  Serial.print(res.trig_res<0, 4>());
+  Serial.print("\t");
+  Serial.print(res.trig_res<0, 5>());
+  Serial.print("\t");
+  Serial.print(res.trig_res<0, 6>());
+  Serial.print("\t");
+  Serial.println(res.trig_res<0, 7>());
 }
 void adc_etc_0_isr() {
   ADC_ETC_DONE0_1_IRQ |= done0_tiggers;
@@ -58,7 +66,7 @@ void AdcEtc::begin(AdcEtcBeginInfo &info) {
   if (info.adc1_sample_time >> 2) ADC1_CFG |= ADC_CFG_ADLSMP; // enable long sampling time (see ADSTS)
   ADC1_CFG |= ADC_CFG_MODE(info.adc1_resolution); // conversion resolution. 0b10 = 12bit
   ADC1_CFG |= ADC_CFG_ADICLK(0b00); // input clock select
-  ADC2_HC0 = ADC_HC_ADCH(16); // channel of hardware trigger 1 is controlled by ADC_ETC
+  ADC1_HC0 = ADC_HC_ADCH(16); // channel of hardware trigger 1 is controlled by ADC_ETC
   ADC1_HC1 = ADC_HC_ADCH(16); // channel of hardware trigger is controlled by ADC_ETC
   ADC1_HC2 = ADC_HC_ADCH(16); // channel of hardware trigger is controlled by ADC_ETC
   ADC1_HC3 = ADC_HC_ADCH(16); // channel of hardware trigger is controlled by ADC_ETC
@@ -103,6 +111,8 @@ void AdcEtc::begin(AdcEtcBeginInfo &info) {
     for (int segm = 0; segm < info.chains[chain].chain_length; segm++) {
       *((&(IMXRT_ADC_ETC.TRIG[chain].CHAIN_1_0)) + ((segm / 2) * 4)) = 0;
             // reset trigger chain config
+    }
+    for (int segm = 0; segm < info.chains[chain].chain_length; segm++) {
       if (segm % 2) {
         *((&(IMXRT_ADC_ETC.TRIG[chain].CHAIN_1_0)) + ((segm / 2) * 4)) 
           |= ADC_ETC_TRIG_CHAIN_IE1(segm == info.chains[chain].chain_length - 1 
@@ -133,10 +143,10 @@ void AdcEtc::begin(AdcEtcBeginInfo &info) {
         attachInterruptVector(IRQ_ADC_ETC0, adc_etc_0_isr);
         break;
       case DoneInterrupt::DONE1:
-        attachInterruptVector(IRQ_ADC_ETC0, adc_etc_1_isr);
+        attachInterruptVector(IRQ_ADC_ETC1, adc_etc_1_isr);
         break;
       case DoneInterrupt::DONE2:
-        attachInterruptVector(IRQ_ADC_ETC0, adc_etc_2_isr);
+        attachInterruptVector(IRQ_ADC_ETC2, adc_etc_2_isr);
         break;
       default:
         break;

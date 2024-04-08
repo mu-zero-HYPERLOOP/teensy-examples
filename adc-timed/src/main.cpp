@@ -3,6 +3,7 @@
 #include "pins_arduino.h"
 #include "wiring.h"
 #include <Arduino.h>
+#include "adc.hpp"
 
 #define PRREG(x) Serial.print(#x" 0x"); Serial.println(x,HEX)
 
@@ -108,21 +109,6 @@ void adc_init() {
   ADC1_HC1 = ADC_HC_ADCH(16); // same for hardware trigger control 1
 }
 
-struct AdcEtcBeginInfo {
-  
-};
-
-struct TrigChainInfo {
-
-};
-
-struct AdcEtc {
-  void begin(AdcEtcBeginInfo info);
-  uint16_t readSingle(int pin);
-
-};
-
-
 
 void adc_etc_init() {
   ADC_ETC_CTRL = ADC_ETC_CTRL_SOFTRST; 
@@ -193,6 +179,21 @@ void setup() {
   Serial.begin(38400);
   delay(5000);
   xbar_init();
+
+  int pins[4] = {14,15,16,17};
+  TrigChainInfo chain1 = TrigChainInfo();
+  chain1.trig_num = 0;
+  chain1.chain_length = 4;
+  chain1.read_pins = pins;
+  chain1.trig_sync = false;
+  chain1.chain_priority = 3;
+  chain1.software_trig = false;
+  chain1.intr = DONE0;
+  AdcEtcBeginInfo begin = AdcEtcBeginInfo();
+  begin.num_chains = 1;
+  begin.chains = &chain1;
+  //AdcEtc::begin(begin);
+
   adc_init();
   adc_etc_init();
   flexpwm_init_signed();
@@ -207,6 +208,7 @@ void setup() {
   PRREG(ADC_ETC_CTRL);
   PRREG(ADC_ETC_TRIG0_CTRL);
   PRREG(ADC_ETC_TRIG0_CHAIN_1_0);
+  PRREG(ADC_ETC_TRIG0_CHAIN_3_2);
   PRREG(FLEXPWM2_SM0CTRL);
   PRREG(FLEXPWM2_SM0CTRL2);
   PRREG(FLEXPWM2_OUTEN);
