@@ -3,10 +3,10 @@
 
 
 enum DoneInterrupt {
-  NONE,
-  DONE0,
-  DONE1,
-  DONE2
+  NONE = 0b00,
+  DONE0 = 0b01,
+  DONE1 = 0b10,
+  DONE2 = 0b11
 };
 
 enum HwAvg {
@@ -42,53 +42,40 @@ enum AdcClockDivider {
 
 
 struct TrigChainInfo {
-  int trig_num;
-  int chain_length;
-  int* read_pins;
-  bool trig_sync;
-  int chain_priority;
-  bool software_trig;
-  DoneInterrupt intr;
-
-  TrigChainInfo() {
-    trig_num = 0;
-    chain_length = 1;
-    read_pins = nullptr;
-    trig_sync = false;
-    chain_priority = 0;
-    software_trig = false;
-    intr = NONE;
-  }
+  int trig_num = 0;
+  int chain_length = 1;
+  int* read_pins = nullptr;
+  bool trig_sync = false;
+  int chain_priority = 0;
+  bool software_trig = false;
+  DoneInterrupt intr = NONE;
 };
 
 
 struct AdcEtcBeginInfo {
-  int num_chains;
-  TrigChainInfo* chains;
-  HwAvg adc1_avg;
-  HwAvg adc2_avg;
-  bool adc1_high_speed;
-  bool adc2_high_speed;
-  SampleTime adc1_sample_time;
-  SampleTime adc2_sample_time;
-  AdcClockDivider adc1_clock_div;
-  AdcClockDivider adc2_clock_div;
-  AdcResolution adc1_resolution;
-  AdcResolution adc2_resolution;
+  int num_chains = 0;
+  TrigChainInfo* chains = nullptr;
+  HwAvg adc1_avg = SAMPLE_4;
+  HwAvg adc2_avg = SAMPLE_4;
+  bool adc1_high_speed = false;
+  bool adc2_high_speed = false;
+  SampleTime adc1_sample_time = PERIOD_7;
+  SampleTime adc2_sample_time = PERIOD_7;
+  AdcClockDivider adc1_clock_div = NO_DIV;
+  AdcClockDivider adc2_clock_div = NO_DIV;
+  AdcResolution adc1_resolution = BIT_12;
+  AdcResolution adc2_resolution = BIT_12;
+};
 
-  AdcEtcBeginInfo() {
-    num_chains = 0;
-    chains = nullptr;
-    adc1_avg = SAMPLE_4;
-    adc2_avg = SAMPLE_4;
-    adc1_high_speed = false;
-    adc2_high_speed = false;
-    adc1_sample_time = PERIOD_7;
-    adc2_sample_time = PERIOD_7;
-    adc1_clock_div = NO_DIV;
-    adc2_clock_div = NO_DIV;
-    adc1_resolution = BIT_12;
-    adc2_resolution = BIT_12;
+struct AdcTrigRes {
+  template<int T, int S>
+  static uint16_t trig_res() {
+    ADC_ETC_TRIG0_RESULT_1_0;
+    if (S % 2) {
+      return (*(&IMXRT_ADC_ETC.TRIG[T].RESULT_1_0 + ((S / 2) * 4)) >> 16) & 0xfff;
+    } else {
+      return *(&IMXRT_ADC_ETC.TRIG[T].RESULT_1_0 + ((S / 2) * 4)) & 0xfff;
+    }
   }
 };
 
