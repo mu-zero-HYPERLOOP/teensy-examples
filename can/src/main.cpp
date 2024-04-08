@@ -1,10 +1,8 @@
 #include <Arduino.h>
-#include <cassert>
 #include <cstdlib>
 
 #include "can.h"
 #include "core_pins.h"
-#include "imxrt.h"
 #include "wiring.h"
 
 Can1 can1;

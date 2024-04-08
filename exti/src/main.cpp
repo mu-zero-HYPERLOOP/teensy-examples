@@ -1,46 +1,32 @@
-#include "core_pins.h"
-#include <Arduino.h>
+#include "linear_encoder.h"
 
-const byte interruptPin2 = 2;
-const byte interruptPin3 = 3;
-const String errorMsg = "Missing edge detected!";
-int count = 0;
 
-void increaseCount() {
-    ++count;
-    delay(100);
-}
-
-void detectPin2(){
-  Serial.print("from rising ");
-  Serial.println(count);
-    ++count;
-    delay(100);
-}
-
-void detectPin3(){
-  Serial.print("from falling ");
-  Serial.println(count);
-    ++count;
-    delay(100);
-}
-void detectFallingEdge2(){
-  Serial.print("from falling ");
-  Serial.println(count);
-    ++count;
-    delay(100);
-}
 
 void setup() {
-    pinMode(interruptPin2, INPUT_PULLDOWN);
-    attachInterrupt(digitalPinToInterrupt(interruptPin2), detectPin2, CHANGE);
-    pinMode(interruptPin3, INPUT_PULLDOWN);
-    attachInterrupt(digitalPinToInterrupt(interruptPin3), detectPin3, CHANGE);
+  LinearEncoderBeginInfo beginInfo;
+  beginInfo.stride = Distance::from_u32_mm(10);
+  beginInfo.left_pin = 3;
+  beginInfo.right_pin = 2;
+  LinearEncoder::begin(beginInfo);
 }
 
 
 
 void loop() {
+
+  Velocity v = LinearEncoder::velocity();
+  Distance d = LinearEncoder::distance();
+  uint32_t count = LinearEncoder::stripe_count();
+
+  Serial.print("[v,d,c] = [");
+  Serial.print(v.as_m_per_s());
+  Serial.print(",");
+  Serial.print(d.as_m());
+  Serial.print(",");
+  Serial.print(count);
+  Serial.println("]");
+
+
   delay(100);
 
 }

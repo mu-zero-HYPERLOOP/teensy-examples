@@ -34,7 +34,7 @@ struct CanBeginInfo {
         loopback(false) {}
 };
 
-template <CanInterface INTERFACE> static int __get_can_irq() {
+template <CanInterface INTERFACE> constexpr int __get_can_irq() {
   if constexpr (INTERFACE == CanInterface::CAN1) {
     return IRQ_CAN1;
   } else if constexpr (INTERFACE == CanInterface::CAN2) {
@@ -51,12 +51,12 @@ template <CanInterface INTERFACE> struct __RxSoftwareFifo {
   unsigned int m_end;
 
   // has to be called from ISR_CANX
-  void enqueue(const CAN_message_t &msg) {
+  inline void enqueue(const CAN_message_t &msg) {
     m_queue[m_end] = msg;
     m_end = (m_end + 1) % FIFO_CAP;
   }
 
-  int dequeue(CAN_message_t &msg) {
+  inline int dequeue(CAN_message_t &msg) {
     NVIC_DISABLE_IRQ(__get_can_irq<INTERFACE>());
     if (m_start == m_end) {
       NVIC_ENABLE_IRQ(__get_can_irq<INTERFACE>());
@@ -84,7 +84,7 @@ static void __rx_enqueue(const CAN_message_t &msg) {
 
 template <CanInterface INTERFACE> struct CAN {
 public:
-  void begin(const CanBeginInfo &begin_info) {
+  static void begin(const CanBeginInfo &begin_info) {
     m_flexcan.begin();
     m_flexcan.setMaxMB(64);
     m_flexcan.setBaudRate(static_cast<uint32_t>(begin_info.baudrate));
@@ -111,7 +111,7 @@ public:
    * message was received) returns false. NOTE: This function should not be
    * called from a ISR!
    */
-  int recv(CAN_message_t &msg) { return __getSF<INTERFACE>().dequeue(msg); }
+  static int recv(CAN_message_t &msg) { return __getSF<INTERFACE>().dequeue(msg); }
 
   /**
    * Sends @param msg on the CAN.
@@ -119,7 +119,7 @@ public:
    * NOTE: Sending is not buffered sending a lot might overflow the TX_QUEUE,
    * which leads to dropped messages!
    */
-  int send(const CAN_message_t &msg) { return m_flexcan.write(msg); }
+  static int send(const CAN_message_t &msg) { return m_flexcan.write(msg); }
 
 private:
   static constexpr CAN_DEV_TABLE FlexCanModule() {
@@ -132,7 +132,7 @@ private:
     }
   }
 
-  FlexCAN_T4<CAN::FlexCanModule(), RX_SIZE_1024, TX_SIZE_1024> m_flexcan;
+  static FlexCAN_T4<CAN::FlexCanModule(), RX_SIZE_, TX_SIZE_16> m_flexcan;
 };
 
 typedef CAN<CanInterface::CAN1> Can1;
