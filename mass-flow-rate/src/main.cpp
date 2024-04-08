@@ -1,29 +1,42 @@
 #include <Arduino.h>
+constexpr const int mainPeriod = 100;
 
-const byte massFlowPin = 2;
-const int flow = 100; //100ml
+long previousMillis = 0; // will store last time of the cycle end
+volatile unsigned long duration=0; // accumulates pulse width
+volatile unsigned int pulsecount=0;
+volatile unsigned long previousMicros=0;
 
-volatile unsigned int presentRPM = 0;
-
-void massFlowISR() {
-  static unsigned long previousMicros = micros();                 // remember variable, initialize first time
-  unsigned long presentMicros = micros();                         // read microseconds
-  unsigned long revolutionTime = presentMicros - previousMicros;  // works fine with wrap-around of micros()
-  if (revolutionTime < 1000UL) return;                            // avoid divide by 0, also debounce, speed can't be over 60,000
-  presentRPM = (60000000UL / revolutionTime);                     // calculate
-  previousMicros = presentMicros;                                 // store microseconds for next time
+void pulseHandler() // interrupt handler
+{
+  unsigned long currentMicros = micros();
+  duration += currentMicros - previousMicros;
+  previousMicros = currentMicros;
+  pulsecount++;
 }
 
-int getFlowRate() {
-    return flow / presentRPM;
+void setup()
+{
+  attachInterrupt(0, pulseHandler, CHANGE);
 }
 
-void setup() {
-    pinMode(massFlowPin, INPUT_PULLDOWN);
-    attachInterrupt(digitalPinToInterrupt(massFlowPin), massFlowISR, CHANGE);
-}
+void loop()
+{
+  unsigned long currentMillis = millis();
 
+  if (currentMillis - previousMillis >= mainPeriod) 
+  {
+    previousMillis = currentMillis;   
+    // need to bufferize to avoid glitches
+    unsigned long _duration = duration;
+    unsigned long _pulsecount = pulsecount;
+    duration = 0; // clear counters
+    pulsecount = 0;
+    float Freq = 1e6 / float(_duration);    //Duration is in uSecond so it is 1e6 / T
 
-void loop() {
-    delay(100);
+    Freq *= _pulsecount; // calculate F
+    // output time and frequency data to RS232
+    Serial.print("Frequency: ");
+    Serial.print(Freq);
+    Serial.println("Hz"); 
+  }
 }
