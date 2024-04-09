@@ -36,7 +36,7 @@ void LinearEncoder::begin(const LinearEncoderBeginInfo &beginInfo) {
   m_right_pin = beginInfo.right_pin;
   m_stride = beginInfo.stride;
 
-  /* pinMode(m_left_pin, INPUT_PULLDOWN); */
+  pinMode(m_left_pin, INPUT_PULLDOWN);
   attachInterrupt(m_left_pin, LinearEncoder::encoder_isr, CHANGE);
   m_stripe_count = 0;
   m_dir = DIRECTION_RIGHT;

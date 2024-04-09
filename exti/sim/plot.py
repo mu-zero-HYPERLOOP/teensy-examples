@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 plt.rcParams["figure.figsize"] = [7.00, 3.50]
 plt.rcParams["figure.autolayout"] = True
 
-columns = ["time", "velocity", "distance", "left", "right", "estimated_distance", "estimated_velocity", "stripe_count", "isr_called", "ewma_distance"]
+columns = ["time", "velocity", "distance", "left", "right", "estimated_distance", "estimated_velocity", "stripe_count", "isr_called", "ewma_distance", "distance_error"]
 
 
 df = pd.read_csv("./result.csv", usecols=columns);
@@ -16,6 +16,7 @@ figure, axis = plt.subplots(4);
 
 axis[0].plot(df.time, df.distance, label="distance");
 axis[0].plot(df.time, df.estimated_distance, label="estimation");
+axis[0].plot(df.time, df.distance_error, label="error");
 # axis[0].plot(df.time, df.ewma_distance, label="ewma_estimation");
 axis[0].set_title("distance");
 axis[0].grid();

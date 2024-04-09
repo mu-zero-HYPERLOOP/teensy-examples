@@ -19,8 +19,6 @@ struct CanFilter {
   bool ide;
 };
 
-typedef void (*can_rx_isr_func)(const CAN_message_t &msg);
-
 struct CanBeginInfo {
   CanBaudrate baudrate;
 
@@ -34,55 +32,45 @@ struct CanBeginInfo {
         loopback(false) {}
 };
 
-template <CanInterface INTERFACE> constexpr int __get_can_irq() {
-  if constexpr (INTERFACE == CanInterface::CAN1) {
-    return IRQ_CAN1;
-  } else if constexpr (INTERFACE == CanInterface::CAN2) {
-    return IRQ_CAN2;
-  } else {
-    return IRQ_CAN3;
-  }
-}
-
-template <CanInterface INTERFACE> struct __RxSoftwareFifo {
-  static constexpr size_t FIFO_CAP = 128;
-  CAN_message_t m_queue[FIFO_CAP];
-  unsigned int m_start;
-  unsigned int m_end;
-
-  // has to be called from ISR_CANX
-  inline void enqueue(const CAN_message_t &msg) {
-    m_queue[m_end] = msg;
-    m_end = (m_end + 1) % FIFO_CAP;
-  }
-
-  inline int dequeue(CAN_message_t &msg) {
-    NVIC_DISABLE_IRQ(__get_can_irq<INTERFACE>());
-    if (m_start == m_end) {
-      NVIC_ENABLE_IRQ(__get_can_irq<INTERFACE>());
-      return 0;
-    }
-    msg = m_queue[m_start];
-    m_start = (m_start + 1) % FIFO_CAP;
-
-    NVIC_ENABLE_IRQ(__get_can_irq<INTERFACE>());
-    return 1;
-  }
-};
-
-template <CanInterface INTERFACE>
-static __RxSoftwareFifo<INTERFACE> &__getSF() {
-  static __RxSoftwareFifo<INTERFACE> s_fifo;
-  return s_fifo;
-}
-
-template <CanInterface INTERFACE>
-static void __rx_enqueue(const CAN_message_t &msg) {
-  __RxSoftwareFifo<INTERFACE> &fifo = __getSF<INTERFACE>();
-  fifo.enqueue(msg);
-}
-
 template <CanInterface INTERFACE> struct CAN {
+private:
+  struct RxSoftwareFifo {
+
+    static constexpr size_t FIFO_CAP = 128;
+    CAN_message_t m_queue[FIFO_CAP];
+    unsigned int m_start;
+    unsigned int m_end;
+
+    // has to be called from ISR_CANX
+    inline void enqueue(const CAN_message_t &msg) {
+      m_queue[m_end] = msg;
+      m_end = (m_end + 1) % FIFO_CAP;
+    }
+
+    inline int dequeue(CAN_message_t &msg) {
+      NVIC_DISABLE_IRQ(GetCanIRQ());
+      if (m_start == m_end) {
+        NVIC_ENABLE_IRQ(GetCanIRQ());
+        return 0;
+      }
+      msg = m_queue[m_start];
+      m_start = (m_start + 1) % FIFO_CAP;
+
+      NVIC_ENABLE_IRQ(GetCanIRQ());
+      return 1;
+    }
+
+    static constexpr int GetCanIRQ() {
+      if constexpr (INTERFACE == CanInterface::CAN1) {
+        return IRQ_CAN1;
+      } else if constexpr (INTERFACE == CanInterface::CAN2) {
+        return IRQ_CAN2;
+      } else {
+        return IRQ_CAN3;
+      }
+    }
+  };
+
 public:
   static void begin(const CanBeginInfo &begin_info) {
     m_flexcan.begin();
@@ -92,18 +80,21 @@ public:
     if (begin_info.filter_count > 0) {
       m_flexcan.setFIFOFilter(REJECT_ALL);
     }
+
     for (size_t i = 0; i < begin_info.filter_count; ++i) {
       m_flexcan.setFIFOManualFilter(i, begin_info.filters[i].id,
                                     begin_info.filters[i].mask,
                                     begin_info.filters[i].ide ? EXT : STD);
     }
     m_flexcan.enableFIFOInterrupt();
-    m_flexcan.onReceive(__rx_enqueue<INTERFACE>);
+    m_flexcan.onReceive(enqueue);
     if (begin_info.loopback) {
       m_flexcan.enableLoopBack();
     }
     m_flexcan.mailboxStatus();
   }
+
+  static void enqueue(const CAN_message_t &msg) { m_fifo.enqueue(msg); }
 
   /**
    * Receives a message from the CAN and writes it to @param msg.
@@ -111,7 +102,7 @@ public:
    * message was received) returns false. NOTE: This function should not be
    * called from a ISR!
    */
-  static int recv(CAN_message_t &msg) { return __getSF<INTERFACE>().dequeue(msg); }
+  static int recv(CAN_message_t &msg) { return m_fifo.dequeue(msg); }
 
   /**
    * Sends @param msg on the CAN.
@@ -132,9 +123,20 @@ private:
     }
   }
 
-  static FlexCAN_T4<CAN::FlexCanModule(), RX_SIZE_, TX_SIZE_16> m_flexcan;
+  typedef FlexCAN_T4<CAN::FlexCanModule(), RX_SIZE_256, TX_SIZE_16> FlexCAN;
+
+  static FlexCAN m_flexcan;
+  static RxSoftwareFifo m_fifo;
 };
 
-typedef CAN<CanInterface::CAN1> Can1;
-typedef CAN<CanInterface::CAN2> Can2;
-typedef CAN<CanInterface::CAN3> Can3;
+template <CanInterface INTERFACE>
+typename CAN<INTERFACE>::FlexCAN CAN<INTERFACE>::m_flexcan;
+
+template <CanInterface INTERFACE> 
+typename CAN<INTERFACE>::RxSoftwareFifo CAN<INTERFACE>::m_fifo;
+
+
+ typedef CAN<CanInterface::CAN1> Can1;
+ typedef CAN<CanInterface::CAN2> Can2;
+ typedef CAN<CanInterface::CAN3> Can3;
+
