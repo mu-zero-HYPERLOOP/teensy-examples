@@ -5,12 +5,6 @@
 #include "core_pins.h"
 #include "wiring.h"
 
-Can1 can1;
-
-void can0_rx(const CAN_message_t &msg) {
-  Serial.print("RX:");
-  Serial.println(msg.id);
-}
 
 void setup() {
   Serial.begin(38400);
@@ -30,7 +24,7 @@ void setup() {
   can1_beginInfo.filters = onlyOdIds;
   can1_beginInfo.filter_count = 64;
 
-  can1.begin(can1_beginInfo);
+  Can1::begin(can1_beginInfo);
 }
 
 uint32_t id = 0;
@@ -42,11 +36,11 @@ void loop() {
   CAN_message_t msg;
   msg.id = 1;
   Serial.println("Sending");
-  can1.send(msg);
+  Can1::send(msg);
 
   delay(100);
 
-  can1.recv(msg);
+  Can1::recv(msg);
   Serial.println("Received");
 
   if (msg.id != 1) {

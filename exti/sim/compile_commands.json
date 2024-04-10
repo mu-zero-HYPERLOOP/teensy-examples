@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/home/kistenklaus/Documents/muzero/teensy-examples/exti/sim/build",
+  "command": "/usr/bin/c++    -o CMakeFiles/main.dir/main.cpp.o -c /home/kistenklaus/Documents/muzero/teensy-examples/exti/sim/main.cpp",
+  "file": "/home/kistenklaus/Documents/muzero/teensy-examples/exti/sim/main.cpp",
+  "output": "CMakeFiles/main.dir/main.cpp.o"
+},
+{
+  "directory": "/home/kistenklaus/Documents/muzero/teensy-examples/exti/sim/build",
+  "command": "/usr/bin/c++    -o CMakeFiles/main.dir/linear_encoder.cpp.o -c /home/kistenklaus/Documents/muzero/teensy-examples/exti/sim/linear_encoder.cpp",
+  "file": "/home/kistenklaus/Documents/muzero/teensy-examples/exti/sim/linear_encoder.cpp",
+  "output": "CMakeFiles/main.dir/linear_encoder.cpp.o"
+}
+]
