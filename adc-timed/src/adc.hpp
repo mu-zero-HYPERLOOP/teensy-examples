@@ -1,22 +1,21 @@
 #include "imxrt.h"
 
 
-
-enum DoneInterrupt {
+enum DoneInterrupt:uint8_t {
   NONE = 0b00,
   DONE0 = 0b01,
   DONE1 = 0b10,
   DONE2 = 0b11
 };
 
-enum HwAvg {
+enum HwAvg:uint8_t {
   SAMPLE_4 = 0b00,
   SAMPLE_8 = 0b01,
   SAMPLE_16 = 0b10,
   SAMPLE_32 = 0b11,
 };
 
-enum SampleTime {
+enum SampleTime:uint8_t {
   PERIOD_3 = 0b000,
   PERIOD_5 = 0b001,
   PERIOD_7 = 0b010,
@@ -27,22 +26,33 @@ enum SampleTime {
   PERIOD_25 = 0b111,
 };
 
-enum AdcResolution {
+enum AdcResolution:uint8_t {
   BIT_8 = 0b00,
   BIT_10 = 0b01,
   BIT_12 = 0b10,
 };
 
-enum AdcClockDivider {
+enum AdcClockDivider:uint8_t {
   NO_DIV = 0b00,
   DIV_2 = 0b01,
   DIV_4 = 0b10,
   DIV_8 = 0b11
 };
 
+// Trigger 0-3 use adc1, tigger 4-7 use adc2
+// Trigger 3 and 7 are reserved for software manual analogRead-style reads
+enum AdcEtcTrigger:uint8_t {
+  TRIG0 = 0,
+  TRIG1 = 1,
+  TRIG2 = 2,
+  TRIG4 = 4,
+  TRIG5 = 5,
+  TRIG6 = 6,
+};
+
 
 struct TrigChainInfo {
-  int trig_num = 0;
+  AdcEtcTrigger trig_num = TRIG0;
   int chain_length = 1;
   int* read_pins = nullptr;
   bool trig_sync = false;
@@ -68,19 +78,21 @@ struct AdcEtcBeginInfo {
 };
 
 struct AdcTrigRes {
+  // get result of conversion for trigger T in chain segment S
   template<int T, int S>
   static uint16_t trig_res() {
-    ADC_ETC_TRIG0_RESULT_1_0;
+    volatile uint32_t* result_base = &IMXRT_ADC_ETC.TRIG[T].RESULT_1_0 + (S / 2);
     if (S % 2) {
-      return (*(&IMXRT_ADC_ETC.TRIG[T].RESULT_1_0 + ((S / 2) * 4)) >> 16) & 0xfff;
+      return (*result_base >> 16) & 0xfff;
     } else {
-      return *(&IMXRT_ADC_ETC.TRIG[T].RESULT_1_0 + ((S / 2) * 4)) & 0xfff;
+      return *result_base & 0xfff;
     }
   }
 };
 
 
 struct AdcEtc {
+  static bool adc_initialized;
   static void begin(AdcEtcBeginInfo &info);
   static uint16_t readSingle(int pin);
 

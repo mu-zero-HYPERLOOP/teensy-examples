@@ -71,8 +71,6 @@ void flexpwm_init_signed() {     //set PWM
         // A & B independant and use IPBus clock for counter/prescaler
   FLEXPWM2_SM1INIT = 0x8000; // value to start at after reset
                              // should be max negative value
-  PRREG(FLEXPWM2_SM1INIT);
-                         
   FLEXPWM2_SM1VAL0 = 0; // mid point for symetrical pulse around 0x00 not used
   FLEXPWM2_SM1VAL1 = 0x7fff; // value at which counter resets
                              // should be max positive value
@@ -114,7 +112,7 @@ void adc_etc_init() {
   ADC_ETC_CTRL = ADC_ETC_CTRL_SOFTRST; 
   ADC_ETC_CTRL &= ~ADC_ETC_CTRL_SOFTRST;
         // trigger software reset of all registers in ADC_ETC
-  ADC_ETC_CTRL |= ADC_ETC_CTRL_TSC_BYPASS; // bypass touch screen control to adc2
+  //ADC_ETC_CTRL |= ADC_ETC_CTRL_TSC_BYPASS; // bypass touch screen control to adc2
   ADC_ETC_CTRL |= ADC_ETC_CTRL_TRIG_ENABLE(0b00000001);
         // select external xbar triggers
 
@@ -125,7 +123,7 @@ void adc_etc_init() {
         // select interrupt after segment finished
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_B2B1;
         // trigger next conversion immediately after segment finished
-  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS1(0b00000010);
+  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS1(0b00000001);
         // hardware trigger select
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL1(8);
         // select adc channel -> pin 15
@@ -133,7 +131,7 @@ void adc_etc_init() {
         // select interrupt after segment finished
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_B2B0;
         // trigger next conversion immediately after segment finished
-  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b00000010);
+  ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b00000001);
         // hardware trigger select
   ADC_ETC_TRIG0_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL0(7);
         // select adc channel -> pin 14
@@ -141,12 +139,12 @@ void adc_etc_init() {
   ADC_ETC_TRIG0_CHAIN_3_2 = ADC_ETC_TRIG_CHAIN_IE1(0b01);
         // interrupt done0 when segment3 finished
   ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_B2B1;
-  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_HWTS1(0b00000010);
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_HWTS1(0b00000001);
   ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_CSEL1(11);
         // select adc channel -> pin 17
   ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_IE0(0b00);
   ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_B2B0;
-  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b00000010);
+  ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b00000001);
   ADC_ETC_TRIG0_CHAIN_3_2 |= ADC_ETC_TRIG_CHAIN_CSEL0(12);
         // select adc channel -> pin 16
   attachInterruptVector(IRQ_ADC_ETC0, adc_etc0_isr);
@@ -182,73 +180,45 @@ void setup() {
 
   int pins[4] = {14,15,16,17};
   TrigChainInfo chain1 = TrigChainInfo();
-  chain1.trig_num = 0;
+  chain1.trig_num = TRIG0;
   chain1.chain_length = 4;
   chain1.read_pins = pins;
   chain1.trig_sync = false;
-  chain1.chain_priority = 3;
+  chain1.chain_priority = 0;
   chain1.software_trig = false;
   chain1.intr = DONE0;
   AdcEtcBeginInfo begin = AdcEtcBeginInfo();
-  begin.num_chains = 1;
+  begin.adc1_avg = HwAvg::SAMPLE_4;
+  begin.adc1_clock_div = AdcClockDivider::NO_DIV;
+  begin.adc1_high_speed = true;
+  begin.adc1_resolution = BIT_12;
+  begin.adc1_sample_time = PERIOD_5;
+  begin.num_chains = 0;
   begin.chains = &chain1;
-  //AdcEtc::begin(begin);
+  AdcEtc::begin(begin);
 
-  adc_init();
-  adc_etc_init();
+  //adc_init();
+  //adc_etc_init();
   flexpwm_init_signed();
   //flexpwm_init_edgealigned();
   *(portConfigRegister(4)) = 1; // set pin 4 as output
   *(portConfigRegister(5)) = 1; // set pin 5 as output
+  AdcEtc::readSingle(24);
 
   Serial.println("init complete");
   PRREG(ADC1_CFG);
   PRREG(ADC1_HC0);
   PRREG(ADC1_HC1);
+  PRREG(ADC1_HC3);
   PRREG(ADC_ETC_CTRL);
-  PRREG(ADC_ETC_TRIG0_CTRL);
-  PRREG(ADC_ETC_TRIG0_CHAIN_1_0);
-  PRREG(ADC_ETC_TRIG0_CHAIN_3_2);
-  PRREG(FLEXPWM2_SM0CTRL);
-  PRREG(FLEXPWM2_SM0CTRL2);
-  PRREG(FLEXPWM2_OUTEN);
+  PRREG(ADC_ETC_TRIG3_CTRL);
+  PRREG(ADC_ETC_TRIG3_CHAIN_1_0);
 }
 
 
 void loop() {
-  //FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_CLDOK(0x0f);
-
-  //FLEXPWM2_SM0VAL3++;
-  //if (FLEXPWM2_SM0VAL3 > FLEXPWM2_SM0VAL1) FLEXPWM2_SM0VAL3 = FLEXPWM2_SM0INIT;
-
-  //FLEXPWM2_SM1VAL2++;
-  //if ((int16_t)FLEXPWM2_SM1VAL2 >= 0) FLEXPWM2_SM1VAL2 = FLEXPWM2_SM1INIT;
-  //FLEXPWM2_SM1VAL3 = -(int16_t)FLEXPWM2_SM1VAL2;
-
-  //FLEXPWM2_MCTRL |= FLEXPWM_MCTRL_LDOK(0x0f);
-
-  //Serial.print("sm0 val2: ");
-  //Serial.println(FLEXPWM2_SM0VAL2);
-  //Serial.print("sm0 val3: ");
-  //Serial.println(FLEXPWM2_SM0VAL3);
-
-  //Serial.print("sm1 val2: ");
-  //Serial.println((int16_t) FLEXPWM2_SM1VAL2);
-  //Serial.print("sm1 val3: ");
-  //Serial.println(FLEXPWM2_SM1VAL3);
-  delay(10);
-  //Serial.print("val0 ");
-  //Serial.println(val0);
-  //Serial.print("val1 ");
-  //Serial.println(val1);
-  //Serial.println("loop still alive");
-
-
-
-  //ADC_ETC_TRIG0_CTRL |= ADC_ETC_TRIG_CTRL_TRIG_MODE;
-  //ADC_ETC_TRIG0_CTRL |= ADC_ETC_TRIG_CTRL_SW_TRIG;
-
-  //Serial.println("aa");
-
+  Serial.println(AdcEtc::readSingle(14));
+  delay(1000);
+  PRREG(ADC_ETC_TRIG3_CTRL);
 
 }
