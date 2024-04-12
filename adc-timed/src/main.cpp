@@ -213,12 +213,12 @@ void setup() {
   PRREG(ADC_ETC_CTRL);
   PRREG(ADC_ETC_TRIG3_CTRL);
   PRREG(ADC_ETC_TRIG3_CHAIN_1_0);
+  pinMode(12, INPUT_PULLDOWN);
 }
 
 
 void loop() {
-  Serial.println(AdcEtc::readSingle(14));
+  Serial.println(AdcEtc::readSingle(13));
   delay(1000);
-  PRREG(ADC_ETC_TRIG3_CTRL);
 
 }

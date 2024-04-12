@@ -4,6 +4,7 @@
 #include "analog.c"
 #include "usb_serial.h"
 
+#define PRREG(x) Serial.print(#x" 0x"); Serial.println(x,HEX)
 
 static volatile uint8_t done0_triggers = 0;
 static volatile uint8_t done1_triggers = 0;
@@ -153,7 +154,6 @@ void AdcEtc::begin(AdcEtcBeginInfo &info) {
         | ADC_ETC_TRIG_CHAIN_HWTS0(1 << (trig_num));
             // select harware trigger for ADC
             // trigger 0-3 read from adc1, trigger 4-7 read from adc2
-            // both only use HC0-HC3
     }
     switch (info.chains[chain].intr) {
       case DoneInterrupt::DONE0:
@@ -190,40 +190,42 @@ uint16_t AdcEtc::readSingle(int pin) {
 	if(!(ch & 0x80)) { // use adc1
     ADC1_HC3 = ADC_HC_ADCH(16);
 
-    ADC_ETC_CTRL |= ADC_ETC_CTRL_TRIG_ENABLE(0b00001000);
-    ADC_ETC_TRIG3_CTRL = ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0);
+    ADC_ETC_CTRL |= ADC_ETC_CTRL_TRIG_ENABLE(1 << 3);
+
+    ADC_ETC_TRIG3_CTRL = ADC_ETC_TRIG_CTRL_TRIG_PRIORITY(0); // lowest priority
+    ADC_ETC_TRIG3_CTRL |= ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0); // chain length of 1
     ADC_ETC_TRIG3_CTRL |= ADC_ETC_TRIG_CTRL_TRIG_MODE; // enable software trigger
             
-    ADC_ETC_TRIG3_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_IE0(0b00);
+    ADC_ETC_TRIG3_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_IE0(0b00); // no done interrupt
     ADC_ETC_TRIG3_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_B2B0;
-    ADC_ETC_TRIG3_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b00001000);
+    ADC_ETC_TRIG3_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(1 << 3);
     ADC_ETC_TRIG3_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL0(ch & 0x1f);
 
-		ADC_ETC_TRIG3_CTRL |= ADC_ETC_TRIG_CTRL_SW_TRIG; // trigger conversion
-		//while (!(ADC1_HS)) {
-		//	//yield(); // TODO: what happens if yield-called code uses analogRead()
-    //  Serial.println("waiting");
-		//}
+		ADC_ETC_TRIG3_CTRL |= ADC_ETC_TRIG_CTRL_SW_TRIG; // trigger a conversion
+		while (ADC1_GS & 0b1) { // not great: only checks whether any conversion is still in progess
+      Serial.println("adc read single waiting");
+		}
 		return ADC_ETC_TRIG3_RESULT_1_0 & 0xfff;
 	} else { // use adc2
     ADC2_HC7 = ADC_HC_ADCH(16);
-    ADC2_CFG |= ADC_CFG_OVWREN;
-    Serial.println("adc2");
+
+    ADC_ETC_CTRL |= ADC_ETC_CTRL_TRIG_ENABLE(1 << 7);
+
     ADC_ETC_TRIG7_CTRL = ADC_ETC_TRIG_CTRL_TRIG_PRIORITY(0); // lowest priority
     ADC_ETC_TRIG7_CTRL |= ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0); // 0 -> chain length of 1
     ADC_ETC_TRIG7_CTRL |= ADC_ETC_TRIG_CTRL_TRIG_MODE; // enable software trigger
 
-    ADC_ETC_TRIG7_CHAIN_1_0 = ADC_ETC_TRIG_CHAIN_IE0(0b11);
+    ADC_ETC_TRIG7_CHAIN_1_0 = ADC_ETC_TRIG_CHAIN_IE0(0b00); // no done interrupt
     ADC_ETC_TRIG7_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_B2B0;
-    ADC_ETC_TRIG7_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(0b10000000);
+    ADC_ETC_TRIG7_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_HWTS0(1 << 7);
     ADC_ETC_TRIG7_CHAIN_1_0 |= ADC_ETC_TRIG_CHAIN_CSEL0(ch & 0x7f);
 
-		ADC_ETC_TRIG7_CTRL |= ADC_ETC_TRIG_CTRL_SW_TRIG; // trigger conversion
-		while (!(ADC2_HS)) {
-			//yield(); // TODO: what happens if yield-called code uses analogRead()
-      Serial.println("waiting");
+		ADC_ETC_TRIG7_CTRL |= ADC_ETC_TRIG_CTRL_SW_TRIG; // trigger a conversion
+		while (ADC2_GS & 0b1) {
+      Serial.println("adc read single waiting");
 		}
-		return (ADC_ETC_TRIG7_RESULT_1_0 >> 16) & 0xfff;
+		return ADC_ETC_TRIG7_RESULT_1_0 & 0xfff;
+    analogRead(pin);
 	}
 }
 
