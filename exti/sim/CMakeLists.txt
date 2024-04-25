@@ -11,5 +11,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_executable(${PROJECT_NAME} 
   main.cpp
   linear_encoder.cpp
+  state_estimation.cpp
+  ekf.cpp
+  accelerometer.cpp
 )
 

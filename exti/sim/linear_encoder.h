@@ -8,17 +8,15 @@
 
 class LinearEncoder {
   private:
-    static Distance distance;
     static uint32_t stripes_counted;
+    static Timestamp last_isr_called;
   public:
     static Distance stride;
-    static Timestamp last_isr_called;
     static void set_distance(Distance new_dist, Timestamp timestamp) {
       if (static_cast<uint32_t>(std::floor(new_dist / stride) != stripes_counted)) {
         stripes_counted = static_cast<uint32_t>(std::floor(new_dist / stride));
         last_isr_called = timestamp;
       }
-      distance = new_dist;
     }
     static int32_t stripe_count() {
       return stripes_counted;
@@ -27,6 +25,6 @@ class LinearEncoder {
       return stripes_counted * stride;
     }
     static Timestamp last_isr() {
-      return last_isr_called;
+      return Timestamp(last_isr_called.m_time_us);
     }
 };

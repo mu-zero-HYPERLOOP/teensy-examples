@@ -4,110 +4,64 @@
 #include <cmath>
 #include <iostream>
 #include "accelerometer.hpp"
+#include "state_estimation.h"
 
-uint32_t g_time = 0;
-
-void pinMode(int, int)  {}
-
-uint32_t micros() { return g_time; }
-
-typedef void (*exti_isr_t)();
-
-exti_isr_t g_exti_isr;
-
-void attachInterrupt(int, void (*isr)(), int) { g_exti_isr = isr; }
-
-uint8_t g_left_pin = 0;
-uint8_t g_right_pin = 0;
-
-uint8_t digitalReadFast(int pin) {
-  if (pin == 0) {
-    return g_left_pin;
-  } else {
-    return g_right_pin;
-  }
-}
-
-Duration SIM_DUR = Duration(10_s);
-Duration STEP = Duration(100_us);
-
+Duration SIM_DUR = Duration(2_s);
+Duration STEP = Duration(10000_us);
 Acceleration ACCEL = Acceleration(1_mps2);
 Velocity MAX_VEL = Velocity(3_mps);
+Duration DECEL_TIME = Duration(1_s);
+Distance STRIDE = Distance(5_cm); 
+uint32_t g_micros = 0;
 
-Duration DECEL_TIME = Duration::from_ms(6000);
-Distance STRIDE = Distance(50_mm); 
+uint32_t micros() {
+   return g_micros;
+}
 
 
 void sim1() {
-
   LinearEncoder::stride = STRIDE;
+  StateEstimation::begin();
 
   Distance true_distance = Distance(0_m);
   Velocity true_vel = Velocity(0_mps);
 
-  std::cout << "time,velocity,distance,left,right,estimated_distance,estimated_"
-               "velocity,stripe_count,isr_called,ewma_distance,distance_error\n";
+  std::cout << "time,true_distance,true_velocity,true_acceleration,"
+               "d_linenc,d_kalman,d_error\n";
 
-  uint32_t isr_called = 0;
-
-  Distance ewma_d = Distance(0_m);
-  for (uint32_t time_us = 0; time_us < SIM_DUR.as_us();
-       time_us += STEP.as_us()) {
-    g_time = time_us;
+  for (Duration sim_dur = Duration(0_s); sim_dur < SIM_DUR; sim_dur += STEP) {
+    g_micros = sim_dur.as_us();
     Acceleration accel = Acceleration(0_mps2);
 
-    if (time_us > DECEL_TIME.as_us()) {
+    if (sim_dur > DECEL_TIME) {
       if (true_vel > 0_mps) {
-        accel = accel - 1_mps2 * static_cast<Time>(STEP) / 1_s;
+        accel = accel - 1_mps2;
       }
     } else {
       if (true_vel < MAX_VEL) {
-        accel = accel + 1_mps2 * static_cast<Time>(STEP) / 1_s;
+        accel = accel + 1_mps2;
       }
     }
-    true_vel = accel * static_cast<Time>(STEP);
-    true_distance = true_distance + 0.5 * accel * static_cast<Time>(STEP) * static_cast<Time>(STEP);
+    true_vel = true_vel + accel * static_cast<Time>(STEP);
+    //true_distance = true_distance 
+    //  + 0.5 * accel * static_cast<Time>(STEP) * static_cast<Time>(STEP);
+    true_distance += true_vel * static_cast<Time>(STEP);
     
-    LinearEncoder::distance = true_distance;
+    LinearEncoder::set_distance(true_distance, Timestamp(sim_dur.as_us()));
     Accelerometer::acceleration = accel;
 
-    Duration(1_us);
+    StateEstimation::update();
 
-    uint32_t stride_um = STRIDE.as_u32_um();
-    uint32_t period_um = stride_um;
-    uint32_t td_um = true_distance.as_u32_um();
-
-    uint32_t left_phase = td_um % (stride_um * 2);
-    uint8_t left = left_phase > stride_um;
-
-    uint32_t right_phase = (td_um + stride_um / 2) % (stride_um * 2);
-    g_right_pin = right_phase > stride_um;
-
-    if (!g_left_pin && left) { // rising edge
-      g_left_pin = 1;
-      isr_called += 1;
-      g_exti_isr();
-    } else if (g_left_pin && !left) { // falling edge
-      g_left_pin = 0;
-      isr_called += 1;
-      g_exti_isr();
-    }
-
-    Distance d = LinearEncoder::distance();
-    ewma_d = ewma_d * (0.995f) + d * (0.005f);
-    float distance_error = true_distance.as_m() - d.as_m();;
-    Velocity v = LinearEncoder::velocity();
+    Distance d_linenc = LinearEncoder::position();
+    Distance d_kalman = StateEstimation::getPosition();
+    float distance_error = static_cast<float>(true_distance - d_kalman);
     uint32_t c = LinearEncoder::stripe_count();
-    std::cout << Duration::from_u32_us(time_us).as_s() << "," //
-              << vel.as_m_per_s() << ","                      //
-              << true_distance.as_m() << ","                  //
-              << (uint32_t)left << ","                        //
-              << (uint32_t)g_right_pin << ","                 //
-              << d.as_m() << ","                              //
-              << v.as_m_per_s() << ","                        //
-              << c << ","                                     //
-              << isr_called << ","                            //
-              << ewma_d.as_m() << ","  //
+    std::cout << static_cast<float>(sim_dur.as_us()) / 1000000.0f << "," 
+              << static_cast<float>(true_distance) << ","                
+              << static_cast<float>(true_vel) << ","                     
+              << static_cast<float>(accel) << ","
+              << static_cast<float>(d_linenc) << ","                     
+              << static_cast<float>(d_kalman) << ","                     
               << distance_error <<
               "\n";
   }
@@ -115,75 +69,8 @@ void sim1() {
 }
 
 
-void sim2() {
-
-  LinearEncoderBeginInfo beginInfo;
-  beginInfo.left_pin = 0;
-  beginInfo.right_pin = 1;
-  beginInfo.stride = STRIDE;
-  LinearEncoder::begin(beginInfo);
-
-  Distance true_distance = Distance::from_u32_um(0);
-  Velocity vel = Velocity::from_i32_um_per_s(0);
-
-  std::cout << "time,velocity,distance,left,right,estimated_distance,estimated_"
-               "velocity,stripe_count,isr_called,ewma_distance,distance_error\n";
-
-  uint32_t isr_called = 0;
-
-  Distance ewma_d = Distance::from_u32_um(0);
-  for (uint32_t time_us = 0; time_us < SIM_DUR.as_u32_us();
-       time_us += STEP.as_u32_us()) {
-    g_time = time_us;
-    Velocity accel = ACCEL * (STEP.as_s() * ((float)std::cos(time_us / (M_PI * 1e5) )));
-
-    vel += accel;
-    Duration::from_u32_us(1);
-    true_distance = true_distance + vel * STEP.as_s();
-
-    uint32_t stride_um = STRIDE.as_u32_um();
-    uint32_t period_um = stride_um;
-    uint32_t td_um = true_distance.as_u32_um();
-
-    uint32_t left_phase = td_um % (stride_um * 2);
-    uint8_t left = left_phase > stride_um;
-
-    uint32_t right_phase = (td_um + stride_um / 2) % (stride_um * 2);
-    g_right_pin = right_phase > stride_um;
-
-    if (!g_left_pin && left) { // rising edge
-      g_left_pin = 1;
-      isr_called += 1;
-      g_exti_isr();
-    } else if (g_left_pin && !left) { // falling edge
-      g_left_pin = 0;
-      isr_called += 1;
-      g_exti_isr();
-    }
-
-    Distance d = LinearEncoder::distance();
-    ewma_d = ewma_d * (0.995f) + d * (0.005f);
-    float distance_error = true_distance.as_m() - d.as_m();;
-    Velocity v = LinearEncoder::velocity();
-    uint32_t c = LinearEncoder::stripe_count();
-    std::cout << Duration::from_u32_us(time_us).as_s() << "," //
-              << vel.as_m_per_s() << ","                      //
-              << true_distance.as_m() << ","                  //
-              << (uint32_t)left << ","                        //
-              << (uint32_t)g_right_pin << ","                 //
-              << d.as_m() << ","                              //
-              << v.as_m_per_s() << ","                        //
-              << c << ","                                     //
-              << isr_called << ","                            //
-              << ewma_d.as_m() << ","  //
-              << distance_error <<
-              "\n";
-  }
-  std::cout.flush();
-}
 
 
 int main() {
-
-  sim2();
+  sim1();
 }

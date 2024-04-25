@@ -66,8 +66,6 @@ public:
 
   explicit inline operator uint32_t() const { return m_time_us; }
   explicit inline operator uint32_t() const volatile { return m_time_us; }
-
-private:
   explicit Timestamp(uint32_t time) : m_time_us(time) {}
   uint32_t m_time_us;
 };
