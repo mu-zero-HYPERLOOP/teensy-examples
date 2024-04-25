@@ -1,6 +1,9 @@
 #include "linear_encoder.h"
+#include "metrics.h"
+#include "timestamp.h"
 #include <cmath>
 #include <iostream>
+#include "accelerometer.hpp"
 
 uint32_t g_time = 0;
 
@@ -25,49 +28,50 @@ uint8_t digitalReadFast(int pin) {
   }
 }
 
-Duration SIM_DUR = Duration::from_u32_s(10);
-Duration STEP = Duration::from_u32_us(100);
+Duration SIM_DUR = Duration(10_s);
+Duration STEP = Duration(100_us);
 
-Velocity ACCEL = Velocity::from_m_per_s(1);
-Velocity MAX_VEL = Velocity::from_m_per_s(3);
+Acceleration ACCEL = Acceleration(1_mps2);
+Velocity MAX_VEL = Velocity(3_mps);
 
-Duration DECEL_TIME = Duration::from_u32_s(6);
-Distance STRIDE = Distance::from_u32_mm(50); 
+Duration DECEL_TIME = Duration::from_ms(6000);
+Distance STRIDE = Distance(50_mm); 
 
 
 void sim1() {
 
-  LinearEncoderBeginInfo beginInfo;
-  beginInfo.left_pin = 0;
-  beginInfo.right_pin = 1;
-  beginInfo.stride = STRIDE;
-  LinearEncoder::begin(beginInfo);
+  LinearEncoder::stride = STRIDE;
 
-  Distance true_distance = Distance::from_u32_um(0);
-  Velocity vel = Velocity::from_i32_um_per_s(0);
+  Distance true_distance = Distance(0_m);
+  Velocity true_vel = Velocity(0_mps);
 
   std::cout << "time,velocity,distance,left,right,estimated_distance,estimated_"
                "velocity,stripe_count,isr_called,ewma_distance,distance_error\n";
 
   uint32_t isr_called = 0;
 
-  Distance ewma_d = Distance::from_u32_um(0);
-  for (uint32_t time_us = 0; time_us < SIM_DUR.as_u32_us();
-       time_us += STEP.as_u32_us()) {
+  Distance ewma_d = Distance(0_m);
+  for (uint32_t time_us = 0; time_us < SIM_DUR.as_us();
+       time_us += STEP.as_us()) {
     g_time = time_us;
-    Velocity accel = ACCEL * STEP.as_s();
+    Acceleration accel = Acceleration(0_mps2);
 
-    if (time_us > DECEL_TIME.as_u32_us()) {
-      if (vel.as_i32_um_per_s() > 0) {
-        vel -= accel;
+    if (time_us > DECEL_TIME.as_us()) {
+      if (true_vel > 0_mps) {
+        accel = accel - 1_mps2 * static_cast<Time>(STEP) / 1_s;
       }
     } else {
-      if (vel.as_i32_um_per_s() < MAX_VEL.as_i32_um_per_s()) {
-        vel += accel;
+      if (true_vel < MAX_VEL) {
+        accel = accel + 1_mps2 * static_cast<Time>(STEP) / 1_s;
       }
     }
-    Duration::from_u32_us(1);
-    true_distance = true_distance + vel * STEP.as_s();
+    true_vel = accel * static_cast<Time>(STEP);
+    true_distance = true_distance + 0.5 * accel * static_cast<Time>(STEP) * static_cast<Time>(STEP);
+    
+    LinearEncoder::distance = true_distance;
+    Accelerometer::acceleration = accel;
+
+    Duration(1_us);
 
     uint32_t stride_um = STRIDE.as_u32_um();
     uint32_t period_um = stride_um;
