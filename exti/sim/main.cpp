@@ -2,15 +2,16 @@
 #include "metrics.h"
 #include "timestamp.h"
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include "accelerometer.hpp"
 #include "state_estimation.h"
 
-Duration SIM_DUR = Duration(2_s);
-Duration STEP = Duration(10000_us);
+Duration SIM_DUR = Duration(5_s);
+Duration STEP = Duration(1_ms);
 Acceleration ACCEL = Acceleration(1_mps2);
 Velocity MAX_VEL = Velocity(3_mps);
-Duration DECEL_TIME = Duration(1_s);
+Duration DECEL_TIME = Duration(2_s);
 Distance STRIDE = Distance(5_cm); 
 uint32_t g_micros = 0;
 
@@ -43,9 +44,11 @@ void sim1() {
       }
     }
     true_vel = true_vel + accel * static_cast<Time>(STEP);
-    //true_distance = true_distance 
-    //  + 0.5 * accel * static_cast<Time>(STEP) * static_cast<Time>(STEP);
-    true_distance += true_vel * static_cast<Time>(STEP);
+    true_distance = true_distance 
+      + true_vel * static_cast<Time>(STEP) + 
+      0.5 * accel * static_cast<Time>(STEP) * static_cast<Time>(STEP);
+    //std::printf("true distance: %f\n", static_cast<float>(true_distance));
+    //std::printf("stripes coutned: %d\n", LinearEncoder::stripe_count());
     
     LinearEncoder::set_distance(true_distance, Timestamp(sim_dur.as_us()));
     Accelerometer::acceleration = accel;

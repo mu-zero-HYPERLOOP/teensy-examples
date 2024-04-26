@@ -1,13 +1,26 @@
 #include "ekf.hpp"
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
+
+template<uint8_t n_row, uint8_t n_col>
+void mat_print(const float* a) {
+  std::printf("matrix: %d x %d\n", n_row, n_col);
+  for (uint8_t row = 0; row < n_row; row++) {
+    for (uint8_t col = 0; col < n_col; col++) {
+      std::printf("%f\t", a[row * n_col + col]);
+    }
+    std::printf("\n");
+  }
+  std::printf("\n");
+}
 
 template<uint8_t n_row, uint8_t n_col>
 void mat_sub(const float* a, const float* b, float* res) {
   for (uint8_t row = 0; row < n_row; row++) {
     for (uint8_t col = 0; col < n_col; col++) {
-      res[row * n_row + col] = a[row * n_row + col] - b[row * n_row + col];
+      res[row * n_col + col] = a[row * n_col + col] - b[row * n_col + col];
     }
   }
 }
@@ -15,7 +28,7 @@ template<uint8_t n_row, uint8_t n_col>
 void mat_add(const float* a, const float* b, float* res) {
   for (uint8_t row = 0; row < n_row; row++) {
     for (uint8_t col = 0; col < n_col; col++) {
-      res[row * n_row + col] = a[row * n_row + col] + b[row * n_row + col];
+      res[row * n_col + col] = a[row * n_col + col] + b[row * n_col + col];
     }
   }
 }
@@ -61,8 +74,7 @@ int choldc1(float* res, float* acc) {
 }
 
 template<uint8_t N>
-int choldcsl(float* a, float* res, float* acc) 
-{
+int choldcsl(float* a, float* res, float* acc) {
     int i,j,k; double sum;
     for (i = 0; i < N; i++) 
         for (j = 0; j < N; j++) 
@@ -78,13 +90,11 @@ int choldcsl(float* a, float* res, float* acc)
             res[j*N+i] = sum / acc[j];
         }
     }
-
     return 0; /* success */
 }
 
 template<uint8_t N>
-int mat_inv(float* a, float* res, float* acc) 
-{
+int mat_inv(float* a, float* res, float* acc) {
     int i,j,k;
     if (choldcsl<N>(a,res,acc)) return 1;
     for (i = 0; i < N; i++) {
@@ -122,6 +132,8 @@ void predict_state_cov(Ekf<dim_state, dim_obser>& ekf) {
   mat_mul<dim_state, dim_state, dim_state>(ekf.F, ekf.P_pre, ekf.temp1);
   mat_mul<dim_state, dim_state, dim_state>(ekf.temp1, ekf.F_T, ekf.P);
   mat_add<dim_state, dim_state>(ekf.P, ekf.Q, ekf.P);
+  //std::printf("predicted P: ");
+  //mat_print<dim_state, dim_state>(ekf.P);
 }
 
 template<uint8_t dim_state, uint8_t dim_obser>
@@ -130,7 +142,12 @@ int calculate_gain(Ekf<dim_state, dim_obser>& ekf) {
   mat_mul<dim_obser, dim_state, dim_state>(ekf.H, ekf.P, ekf.temp3);
   mat_mul<dim_obser, dim_state, dim_obser>(ekf.temp3, ekf.H_T, ekf.temp4);
   mat_add<dim_obser, dim_obser>(ekf.temp4, ekf.R, ekf.temp4);
+  //std::printf("matrix to invert: ");
+  //mat_print<dim_obser, dim_obser>(ekf.temp4);
+  
   if (mat_inv<dim_obser>(ekf.temp4, ekf.temp7, ekf.temp5)) return 1;
+  //std::printf("inverted matrix: ");
+  //mat_print<dim_obser, dim_obser>(ekf.temp7);
   mat_mul<dim_state, dim_obser, dim_obser>(ekf.temp2, ekf.temp7, ekf.K);
   return 0;
 }
@@ -153,6 +170,7 @@ template<uint8_t dim_state, uint8_t dim_obser>
 int ekf_step(Ekf<dim_state, dim_obser>& ekf, float* z) {
   predict_mean<dim_state, dim_obser>(ekf);
   predict_state_cov<dim_state, dim_obser>(ekf);
+  //mat_print<dim_state, 1>(ekf.x_hat);
   if (calculate_gain(ekf)) return 1;
   update_mean<dim_state, dim_obser>(ekf, z);
   update_state_cov<dim_state, dim_obser>(ekf);

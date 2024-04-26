@@ -5,7 +5,7 @@ plt.rcParams["figure.figsize"] = [7.00, 3.50]
 plt.rcParams["figure.autolayout"] = True
 
 df = pd.read_csv("./result.csv");
-print("Contents in csv file: ", df)
+print("Contents in csv file: \n", df)
 
 figure, axis = plt.subplots(2);
 
