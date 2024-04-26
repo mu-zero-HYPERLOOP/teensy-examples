@@ -6,6 +6,7 @@
 #include <iostream>
 #include "accelerometer.hpp"
 #include "state_estimation.h"
+#include "ekf.hpp"
 
 Duration SIM_DUR = Duration(5_s);
 Duration STEP = Duration(1_ms);
@@ -47,7 +48,7 @@ void sim1() {
     true_distance = true_distance 
       + true_vel * static_cast<Time>(STEP) + 
       0.5 * accel * static_cast<Time>(STEP) * static_cast<Time>(STEP);
-    //std::printf("true distance: %f\n", static_cast<float>(true_distance));
+    //if (print) std::printf("true distance: %f\n", static_cast<float>(true_distance));
     //std::printf("stripes coutned: %d\n", LinearEncoder::stripe_count());
     
     LinearEncoder::set_distance(true_distance, Timestamp(sim_dur.as_us()));
@@ -59,16 +60,18 @@ void sim1() {
     Distance d_kalman = StateEstimation::getPosition();
     float distance_error = static_cast<float>(true_distance - d_kalman);
     uint32_t c = LinearEncoder::stripe_count();
-    std::cout << static_cast<float>(sim_dur.as_us()) / 1000000.0f << "," 
-              << static_cast<float>(true_distance) << ","                
-              << static_cast<float>(true_vel) << ","                     
-              << static_cast<float>(accel) << ","
-              << static_cast<float>(d_linenc) << ","                     
-              << static_cast<float>(d_kalman) << ","                     
-              << distance_error <<
-              "\n";
+    if (!print) {
+      std::cout << static_cast<float>(sim_dur.as_us()) / 1000000.0f << "," 
+                << static_cast<float>(true_distance) << ","                
+                << static_cast<float>(true_vel) << ","                     
+                << static_cast<float>(accel) << ","
+                << static_cast<float>(d_linenc) << ","                     
+                << static_cast<float>(d_kalman) << ","                     
+                << distance_error <<
+                "\n";
+      std::cout.flush();
+    }
   }
-  std::cout.flush();
 }
 
 

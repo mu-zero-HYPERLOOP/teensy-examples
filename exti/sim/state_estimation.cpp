@@ -11,15 +11,17 @@
 #include <limits>
 
 static int32_t last_stripe_count = 0;
-constexpr Frequency ACCELEROMETER_FREQ = 2_Hz;
+constexpr Frequency ACCELEROMETER_FREQ = 5_Hz;
 static Timestamp last_accel;
 static Timestamp last_update;
 static Distance s_pos;
 static Velocity s_vel;
 static Acceleration s_acc;
-constexpr float stripe_variance = 0.000001f;
-constexpr float imu_variance = 0.00001f;
+constexpr float stripe_variance = 0.0001f;
+constexpr float imu_variance = 0.001f;
 Ekf<DIM_STATE, DIM_OBSER>StateEstimation::ekf;
+constexpr float max_variance = std::numeric_limits<float>::max();
+
 
 void StateEstimation::begin() {
   last_accel = Timestamp::now();
@@ -86,7 +88,7 @@ Acceleration StateEstimation::getAcceleration() {
 void StateEstimation::position_update(const Distance &pos,
                                       const Timestamp &timestamp) {
   const float dur_us = (timestamp - last_update).as_us();
-  //std::printf("duration since last update in us: %f\n", dur_us);
+  if (print) std::printf("duration since last update in us: %f\n", dur_us);
   last_update = Timestamp::now();
   constexpr float us_in_s = 1000000.0f;
   // predict new state based on old one
@@ -110,13 +112,15 @@ void StateEstimation::position_update(const Distance &pos,
 
   float measurement[DIM_OBSER];
   measurement[stripe_i] = static_cast<float>(pos);
-  //std::printf("pos: %f\n", measurement[stripe_i]);
-  measurement[imu_i] = ekf.f_xu[acc_i]; // use predicted value as missing measurement
+  if (print) std::printf("predicted pos: %f\n", measurement[stripe_i]);
+  measurement[imu_i] = ekf.h_x[imu_i]; // use predicted value as missing measurement
   //ekf.R[imu_i * DIM_OBSER + imu_i] = std::numeric_limits<float>::max(); // and its variance high 
                                               // => measurement should be ignored by filter
-  ekf.R[imu_i * DIM_OBSER + imu_i] = 100000.0f;
+  ekf.R[imu_i * DIM_OBSER + imu_i] = max_variance;
+  if (print) std::printf("max variance: %f\n", max_variance);
+  if (print) std::printf("max variance: %f\n", max_variance + 1.0f);
   int failure = ekf_step<DIM_STATE, DIM_OBSER>(ekf, measurement);
-  //std::printf("failure: %d\n", failure);
+  if (print) std::printf("matrix invert failure: %d\n", failure);
   ekf.R[imu_i * DIM_OBSER + imu_i] = imu_variance;
 }
 
@@ -124,7 +128,7 @@ void StateEstimation::acceleration_update(const Acceleration &acc,
                                           const Timestamp &timestamp) {
   const float dur_us = (timestamp - last_update).as_us();
   last_update = Timestamp::now();
-  constexpr float us_in_s = 1000000.0f;
+  constexpr float us_in_s = 1000000000.0f;
   // predict new state based on old one
   ekf.f_xu[pos_i] = ekf.x_hat[pos_i] 
     + dur_us * ekf.x_hat[speed_i] / us_in_s 
@@ -149,7 +153,7 @@ void StateEstimation::acceleration_update(const Acceleration &acc,
   measurement[imu_i] = static_cast<float>(acc); 
   //ekf.R[stripe_i * DIM_OBSER + stripe_i] = std::numeric_limits<float>::infinity(); // and its variance high 
                                               // => measurement should be ignored by filter
-  ekf.R[stripe_i * DIM_OBSER + stripe_i] = 100000.0f;
+  ekf.R[stripe_i * DIM_OBSER + stripe_i] = max_variance;
   ekf_step<DIM_STATE, DIM_OBSER>(ekf, measurement);
   ekf.R[stripe_i * DIM_OBSER + stripe_i] = stripe_variance;
 }

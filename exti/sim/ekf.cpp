@@ -132,8 +132,10 @@ void predict_state_cov(Ekf<dim_state, dim_obser>& ekf) {
   mat_mul<dim_state, dim_state, dim_state>(ekf.F, ekf.P_pre, ekf.temp1);
   mat_mul<dim_state, dim_state, dim_state>(ekf.temp1, ekf.F_T, ekf.P);
   mat_add<dim_state, dim_state>(ekf.P, ekf.Q, ekf.P);
-  //std::printf("predicted P: ");
-  //mat_print<dim_state, dim_state>(ekf.P);
+  if (print) {
+    std::printf("predicted P: ");
+    mat_print<dim_state, dim_state>(ekf.P);
+  }
 }
 
 template<uint8_t dim_state, uint8_t dim_obser>
@@ -142,12 +144,16 @@ int calculate_gain(Ekf<dim_state, dim_obser>& ekf) {
   mat_mul<dim_obser, dim_state, dim_state>(ekf.H, ekf.P, ekf.temp3);
   mat_mul<dim_obser, dim_state, dim_obser>(ekf.temp3, ekf.H_T, ekf.temp4);
   mat_add<dim_obser, dim_obser>(ekf.temp4, ekf.R, ekf.temp4);
-  //std::printf("matrix to invert: ");
-  //mat_print<dim_obser, dim_obser>(ekf.temp4);
+  if (print) {
+    std::printf("matrix to invert: ");
+    mat_print<dim_obser, dim_obser>(ekf.temp4);
+  }
   
   if (mat_inv<dim_obser>(ekf.temp4, ekf.temp7, ekf.temp5)) return 1;
-  //std::printf("inverted matrix: ");
-  //mat_print<dim_obser, dim_obser>(ekf.temp7);
+  if (print) {
+    std::printf("inverted matrix: ");
+    mat_print<dim_obser, dim_obser>(ekf.temp7);
+  }
   mat_mul<dim_state, dim_obser, dim_obser>(ekf.temp2, ekf.temp7, ekf.K);
   return 0;
 }
@@ -170,13 +176,17 @@ template<uint8_t dim_state, uint8_t dim_obser>
 int ekf_step(Ekf<dim_state, dim_obser>& ekf, float* z) {
   predict_mean<dim_state, dim_obser>(ekf);
   predict_state_cov<dim_state, dim_obser>(ekf);
-  //mat_print<dim_state, 1>(ekf.x_hat);
+  if (print) {
+    std::printf("predicted x: ");
+    mat_print<dim_state, 1>(ekf.x_hat);
+  }
   if (calculate_gain(ekf)) return 1;
   update_mean<dim_state, dim_obser>(ekf, z);
   update_state_cov<dim_state, dim_obser>(ekf);
   return 0;
 }
 
+// needed for compiler to know which template instanciations are actually used
 template int ekf_step(Ekf<3, 2> &ekf, float *z);
 
 

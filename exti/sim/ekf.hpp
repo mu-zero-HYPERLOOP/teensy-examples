@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 
+constexpr bool print = true;
 
 template<uint8_t dim_state, uint8_t dim_obser>
 struct Ekf {
