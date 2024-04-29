@@ -22,9 +22,9 @@ uint32_t micros() {
 
 
 void sim1() {
-  LinearEncoder::stride = STRIDE;
+  LinearEncoder::begin(STRIDE, 0, 0.001);
   StateEstimation::begin();
-  Accelerometer::begin(0.5, 0.15);
+  Accelerometer::begin(0.0, 0.15);
 
   Distance true_distance = Distance(0_m);
   Velocity true_vel = Velocity(0_mps);
