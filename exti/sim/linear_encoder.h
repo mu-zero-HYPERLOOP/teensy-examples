@@ -24,9 +24,8 @@ class LinearEncoder {
     }
     static void set_distance(Distance new_dist, Timestamp timestamp) {
       Distance measured_distance = new_dist + Distance(dist(generator));
-      int32_t measurement = static_cast<uint32_t>(
+      int32_t measurement = static_cast<int32_t>(
           std::floor(static_cast<float>(measured_distance / stride)));
-      if (print) std::printf("linear encoder stripes: %d and dist: %f\n", measurement, static_cast<float>(measurement * stride));
       if (measurement != stripes_counted) {
         stripes_counted = measurement;
         last_isr_called = timestamp;
