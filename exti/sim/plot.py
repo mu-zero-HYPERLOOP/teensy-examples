@@ -11,7 +11,7 @@ print(df.info())
 figure, axis = plt.subplots(3);
 
 axis[0].plot(df.time, df.s_true, label="distance");
-axis[0].plot(df.time, df.s_linenc, label="linenc");
+axis[0].scatter(df.time, df.s_read, label="measurement");
 axis[0].plot(df.time, df.s_kalman, label="kalman");
 axis[0].set_title("distance");
 axis[0].grid();
@@ -24,6 +24,7 @@ axis[1].grid();
 axis[1].legend();
 
 axis[2].plot(df.time, df.a_true, label="acceleration");
+axis[2].scatter(df.time, df.a_read, label="measurement");
 axis[2].plot(df.time, df.a_kalman, label="kalman");
 axis[2].set_title("acceleration");
 axis[2].grid();

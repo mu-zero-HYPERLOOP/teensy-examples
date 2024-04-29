@@ -24,11 +24,12 @@ uint32_t micros() {
 void sim1() {
   LinearEncoder::stride = STRIDE;
   StateEstimation::begin();
+  Accelerometer::begin(0.5, 0.15);
 
   Distance true_distance = Distance(0_m);
   Velocity true_vel = Velocity(0_mps);
 
-  std::cout << "time,s_true,v_true,a_true,"
+  std::cout << "s_read,a_read,time,s_true,v_true,a_true,"
                "s_linenc,s_kalman,v_kalman,a_kalman,s_error\n";
 
   for (Duration sim_dur = Duration(0_s); sim_dur < SIM_DUR; sim_dur += STEP) {

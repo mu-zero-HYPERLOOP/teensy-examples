@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <iostream>
 #include <cstring>
 #include <limits>
 
@@ -24,8 +25,6 @@ constexpr float max_variance = std::numeric_limits<float>::max();
 
 
 void StateEstimation::begin() {
-  last_accel = Timestamp::now();
-
   for (int i = 0; i < DIM_STATE; i++) {
     ekf.x_hat[i] = 1.0f; // arbitrary start. must not be zero!
   }
@@ -66,19 +65,30 @@ void StateEstimation::begin() {
   ekf.H_T[2 * DIM_OBSER + 1] = 1.0f;
 
   last_update = Timestamp::now();
+  last_accel = Timestamp::now();
 }
 
 void StateEstimation::update() {
+  float plot_dist = std::numeric_limits<float>::quiet_NaN();
+  float plot_accel = std::numeric_limits<float>::quiet_NaN();
   uint32_t new_stripe_count = LinearEncoder::stripe_count();
   if (last_stripe_count != new_stripe_count) {
     last_stripe_count = new_stripe_count;
-    StateEstimation::position_update(LinearEncoder::position(), LinearEncoder::last_isr());
+    Distance dist = LinearEncoder::position();
+    plot_dist = static_cast<float>(dist);
+    StateEstimation::position_update(dist, LinearEncoder::last_isr());
   }
   const Timestamp now = Timestamp::now();
   if (now - last_accel > 1.0f / ACCELEROMETER_FREQ) {
     Acceleration accel = Accelerometer::readAccel();
+    plot_accel = static_cast<float>(accel);
     acceleration_update(accel, now);
     last_accel = last_accel + 1.0f / ACCELEROMETER_FREQ;
+  }
+  if (!print) {
+    std::cout << plot_dist << ","
+              << plot_accel << ",";
+    std::cout.flush();
   }
 }
 
