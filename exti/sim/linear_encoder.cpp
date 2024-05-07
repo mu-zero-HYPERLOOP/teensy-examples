@@ -8,5 +8,5 @@ Distance LinearEncoder::stride;
 int32_t LinearEncoder::stripes_counted;
 std::normal_distribution<float> LinearEncoder::dist;
 std::mt19937 LinearEncoder::generator;
-
+Distance LinearEncoder::stripe_miss[stripe_num];
 

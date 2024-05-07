@@ -18,15 +18,15 @@ static Timestamp last_update;
 static Distance s_pos;
 static Velocity s_vel;
 static Acceleration s_acc;
-constexpr float stripe_variance = 0.0001f;
-constexpr float imu_variance = 0.001f;
+constexpr float stripe_variance = 0.003f;
+constexpr float imu_variance = 0.05f;
 Ekf<DIM_STATE, DIM_OBSER>StateEstimation::ekf;
 constexpr float max_variance = std::numeric_limits<float>::max();
 
 
 void StateEstimation::begin() {
   for (int i = 0; i < DIM_STATE; i++) {
-    ekf.x_hat[i] = 1.0f; // arbitrary start. must not be zero!
+    ekf.x_hat[i] = 1.0f;
   }
   ekf.x_hat[pos_i] = 0.0f;
   ekf.x_hat[speed_i] = 0.0f;
